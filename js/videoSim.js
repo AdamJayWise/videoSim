@@ -7,7 +7,6 @@ console.log('videoSim.js')
 // let me start by creating a way to display the image, and show an animated image of a
 // HxW screen with poisson sampling
 
-console.log('main.js in progress');
 
 // Knuth low-lambda Poisson random sample generator
 function poissonSample( lambda = 1, numSamples = 1 ){
@@ -29,34 +28,7 @@ function poissonSample( lambda = 1, numSamples = 1 ){
 
 function showArrayCanvas(arr){
     
-    var scale = 1;
-    var arrMax = 10//Math.max(...arr.data);
-    var arrMin = 0//Math.min(...arr.data);
-    var arrRange = arrMax - arrMin;
-
-    var canvas = document.querySelector("canvas");
-    var context = canvas.getContext("2d");
-
-    context.lineWidth = 0;
-    context.strokeStyle = 'none'
-
-    var m = arr.m;
-    var n = arr.n;
     
-    // scale the data array to the canvas
-    if( canvas.height == canvas.width ){
-        scale = canvas.width / arr.m
-    }
-    else
-        var scale = 2;
-
-    for (var i=0; i<m; i++){
-        for (var j=0; j<n; j++){ 
-            var v = Math.round( 255*(arr.get(i,j)-arrMin)/arrRange );
-            context.fillStyle = `rgb(${v},${v},${v})`;
-            context.fillRect(i*scale, j*scale, scale, scale);
-        }
-    }
 }
 
 
@@ -74,17 +46,79 @@ function randBM() {
 }
 
 // helper function to make arrays of normally distributed random values
-function randnSample(nSamples = 1, mu = 0, sigma = 1) {
+function randnSample(nSamples = 1, mu = 0, sigma = 10) {
     var output = [];
     output.length = nSamples;
     for (i = 0; i < nSamples; i++){
-        output[i] = randBM() * sigma + mu;
+        output[i] = (randBM() * sigma) + mu;
     }
     return output;
 }
 
 
-//function to make ones
+function Camera(paramObj){
+    var self = this;
+    if (!paramObj){
+        console.log('setting parameters');
+        self.name = 'Generic Camera'
+        self.displayScale = 4; // scale factor for displaying image on screen
+        self.xPixels = 64; // number of pixels in x dimension
+        self.yPixels = 64; // number of pixels in y dimension
+        self.xPixelSize = 13; // x pixel size in microns
+        self.yPixelSize = 13; // y pixel size in microns
+        self.readNoise = 2; // rms read noise in electrons
+    }
+    
+    // add a canvas to the document to display this data
+    self.canvas  = d3.select('body')
+                    .append('canvas')
+                    .attr('width', self.displayScale * self.xPixels + ' px')
+                    .attr('height', self.displayScale * self.yPixels + ' px')
+                    .style('border','3px solid green')
+
+
+    self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
+
+    this.updateData = function(){
+        self.simImage.data = randnSample(numSamples = self.xPixels * self.yPixels, mu = 2, sigma = self.readNoise)
+    }
+
+    this.draw = function(){
+        var arr = self.simImage;
+        var scale = 1;
+        var arrMax = 15;//Math.max(...arr.data);
+        var arrMin = 0;//Math.min(...arr.data);
+        var arrRange = arrMax - arrMin;
+
+        var canvas = this.canvas._groups[0][0];
+        var context = canvas.getContext("2d");
+
+        context.lineWidth = 0;
+        context.strokeStyle = 'none'
+
+        var m = arr.m;
+        var n = arr.n;
+        
+        // scale the data array to the canvas
+        if( canvas.height == canvas.width ){
+            scale = canvas.width / arr.m
+        }
+        else
+            var scale = 2;
+
+        for (var i=0; i<m; i++){
+            for (var j=0; j<n; j++){ 
+                var v = Math.round( 255*(arr.get(i,j)-arrMin)/arrRange );
+                context.fillStyle = `rgb(${v},${v},${v})`;
+                context.fillRect(i*scale, j*scale, scale, scale);
+            }
+        }
+    }
+
+
+}
+
+//2d array object to hold data
 
 function Arr2d(n,m,val){
     
@@ -111,14 +145,24 @@ function Arr2d(n,m,val){
     }
 }
 
-// function to add a blob to an array
 
-d3.select('body').append('canvas').attr('width','128 px').attr('height','128 px').style('border','3px solid red')
+
+// manually add an animated canvas to the array
 
 var start = null;
 var delta = 0
 var h = 128;
 var r = generateRandomArray(h,h);
+
+var cam1 = new Camera();
+var cam2 = new Camera();
+var cam3 = new Camera();
+
+cam1.readNoise = 1;
+cam2.readNoise = 3;
+cam3.readNoise = 6;
+
+var cameras = [cam1, cam2, cam3];
 
 function startAnimation(timestamp) {
   if (!start) start = timestamp;
@@ -130,9 +174,8 @@ function animate(){
     delta++;
     if (delta > 0){
         delta = 0;
-        r.randomizeData()
-        console.log(delta)
-        showArrayCanvas(r);
+        cameras.forEach(x=>x.updateData());
+        cameras.forEach(x=>x.draw());
     }
     window.requestAnimationFrame(animate);
 }
