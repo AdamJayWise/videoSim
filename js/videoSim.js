@@ -74,13 +74,25 @@ function Camera(paramObj){
                     .append('canvas')
                     .attr('width', self.displayScale * self.xPixels + ' px')
                     .attr('height', self.displayScale * self.yPixels + ' px')
-                    .style('border','3px solid green')
+                    .style('border','3px solid black')
 
 
     self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
 
     this.updateData = function(){
-        self.simImage.data = randnSample(numSamples = self.xPixels * self.yPixels, mu = 2, sigma = self.readNoise)
+        var offsetX = Math.floor(self.xPixelSize * self.displayScale / 2);
+        var offsetY = Math.floor(self.xPixelSize * self.displayScale / 2);
+        self.simImage.data = randnSample(numSamples = self.xPixels * self.yPixels, mu = 2, sigma = self.readNoise);
+        var q;
+        var featureSize = 15;
+        var featureBrightness = 3;
+        for (var i = 0 + offsetX; i < (featureSize + offsetX); i++){
+            for (var j = 0 + offsetY; j < (featureSize + offsetY); j++){
+                q = poissonSample(featureBrightness ,1)[0];
+                self.simImage.set(i,j, q + self.simImage.get(i,j) );
+            }
+        }
+
     }
 
     this.draw = function(){
@@ -132,7 +144,11 @@ function Arr2d(n,m,val){
     self.length = self.data.length;
     
     self.get = function(i,j){
-        return self.data[i*n + j]
+        return self.data[i*n + j];
+    }
+
+    self.set = function(i,j, v){
+        self.data[i*n + j] = v;
     }
 
     self.mapData = function(f){
