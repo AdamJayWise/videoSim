@@ -1,6 +1,8 @@
 console.log('videoSim.js')
 
 
+var objPos = [0,0];
+
 // overall idea...
 // I want one or more camera objects, each one has an image object which it displays
 // the camera has a height and width, and controls
@@ -97,18 +99,37 @@ function Camera(paramObj){
         }
 
         // right now, this adds a square feature to the random readout noise data
-        var offsetX = Math.floor(self.xPixelSize * self.displayScale / 2);
-        var offsetY = Math.floor(self.xPixelSize * self.displayScale / 2);
-        var featureSize = 15;
-        var featureBrightness = 3;
-        var q;
-        for (var i = 0 + offsetX; i < (featureSize + offsetX); i++){
-            for (var j = 0 + offsetY; j < (featureSize + offsetY); j++){
-                q = poissonSample(featureBrightness ,1)[0];
-                self.simImage.set(i,j, q + self.simImage.get(i,j) );
+        if (1==0){
+            var offsetX = Math.floor(self.xPixelSize * self.displayScale / 2);
+            var offsetY = Math.floor(self.xPixelSize * self.displayScale / 2);
+            var featureSize = 15;
+            var featureBrightness = 3;
+            var q;
+            for (var i = 0 + offsetX; i < (featureSize + offsetX); i++){
+                for (var j = 0 + offsetY; j < (featureSize + offsetY); j++){
+                    q = poissonSample(featureBrightness ,1)[0];
+                    self.simImage.set(i,j, q + self.simImage.get(i,j) );
+                }
             }
         }
         // -------- end add square
+
+        // right now, this adds a gauss feature to the random readout noise data
+        if (1==1){
+            var offsetX = 32;
+            var offsetY = 32;
+            var featureSize = 15;
+            var featureBrightness = 6  ;
+            var q;
+            for (var i = 0; i < self.xPixels; i++){
+                for (var j = 0 ; j < self.yPixels; j++){
+                    var radius = Math.exp( -1 * Math.sqrt( ((j-offsetY + objPos[0])**2) + (i - offsetX + objPos[1])**2 ) / 3 );
+                    q = poissonSample(featureBrightness * radius ,1)[0];
+                    self.simImage.set(i,j, q + self.simImage.get(i,j) );
+                }
+            }
+        }
+        // -------- end add gauss
 
     }
 
@@ -207,6 +228,9 @@ function animate(){
     delta++;
     if (delta > 0){
         delta = 0;
+        objPos[0] = (objPos[0] + Math.random() - 0.5) % 64;
+        objPos[1] = (objPos[1] + Math.random() - 0.5) % 64;
+
         cameras.forEach(x=>x.updateData());
         cameras.forEach(x=>x.draw());
     }
