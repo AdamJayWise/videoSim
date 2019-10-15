@@ -67,6 +67,8 @@ function Camera(paramObj){
         self.xPixelSize = 13; // x pixel size in microns
         self.yPixelSize = 13; // y pixel size in microns
         self.readNoise = 2; // rms read noise in electrons
+        self.CIC = 0.005; // CIC in events / pixel / frame
+        self.offset = 2; // offset in counts for the fake ADC
     }
     
     // add a canvas to the document to display this data
@@ -80,18 +82,33 @@ function Camera(paramObj){
     self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
 
     this.updateData = function(){
+
+        // start with a simple background of read noise, offset by 2 counts
+        self.simImage.data = randnSample(numSamples = self.xPixels * self.yPixels, mu = self.offset, sigma = self.readNoise);
+
+        // I'd like to add a feature which efficienty adds CIC noise.  I'd rather not roll each pixel
+        // separately, but rather generate a random number of points based on the self.CIC property
+        var nCicPoints = Math.round( poissonSample(self.xPixels * self.yPixels * self.CIC) );
+
+        for (var i = 0; i < nCicPoints; i++){
+            var xCoord = Math.floor( Math.random() * self.xPixels );
+            var yCoord = Math.floor( Math.random() * self.yPixels );
+            self.simImage.set(xCoord, yCoord, self.offset + 6*self.readNoise);
+        }
+
+        // right now, this adds a square feature to the random readout noise data
         var offsetX = Math.floor(self.xPixelSize * self.displayScale / 2);
         var offsetY = Math.floor(self.xPixelSize * self.displayScale / 2);
-        self.simImage.data = randnSample(numSamples = self.xPixels * self.yPixels, mu = 2, sigma = self.readNoise);
-        var q;
         var featureSize = 15;
         var featureBrightness = 3;
+        var q;
         for (var i = 0 + offsetX; i < (featureSize + offsetX); i++){
             for (var j = 0 + offsetY; j < (featureSize + offsetY); j++){
                 q = poissonSample(featureBrightness ,1)[0];
                 self.simImage.set(i,j, q + self.simImage.get(i,j) );
             }
         }
+        // -------- end add square
 
     }
 
