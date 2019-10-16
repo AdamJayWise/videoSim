@@ -6,14 +6,21 @@
     canvas {
         margin : 5px;
     }
+
+    .container {
+        display: flex;
+        flex-wrap: wrap;
+    }
 </style>
 	
 </head>
 
 <body>
     <p>Video Sim</p>
-    <p> Left to right: 0, 1, 2, 3, 4, 5 count RMS read noise</p>
-    <p> With a feature of 5 counts peak wandering around</p>
+
+    <div class = "instrumentPanel" id = "mainControls"></div>
+    <div class = "container" id = "mainContainer"></div>
+
 </body>
 
 <script src="js/d3.min.js"></script>

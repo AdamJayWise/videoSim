@@ -2,6 +2,8 @@ console.log('videoSim.js')
 
 
 var objPos = [0,0];
+var featureBrightness = 10;
+var speedMultiplier = 2;
 
 // overall idea...
 // I want one or more camera objects, each one has an image object which it displays
@@ -82,12 +84,19 @@ function Camera(paramObj){
     self.offset = 2; // offset in counts for the fake ADC
     self.featureBrightness = 5; // brightness of image feature
 
+    if (paramObj.containerDivID){
+        self.div = d3.select('#' + paramObj.containerDivID).append('div');
+    }
+    else {
+        self.div = d3.select('body').append('div');
+    }
+
     if (paramObj){
         Object.keys(paramObj).forEach(function(k){self[k]=paramObj[k]})
     }
     
     
-    self.div = d3.select('body').append('div')
+    
     // add a canvas to the document to display this data
     self.canvas  = self.div
                     .append('canvas')
@@ -138,7 +147,7 @@ function Camera(paramObj){
             var offsetY = Math.floor(self.yPixels/2)
             var featureSize = 15;
             var featureBrightness = self.featureBrightness  ;
-            var fSigma = 9; //feature sigma
+            var fSigma = 3; //feature sigma
             var q = 0;
             for (var i = 0; i < self.xPixels; i++){
                 for (var j = 0 ; j < self.yPixels; j++){
@@ -153,7 +162,7 @@ function Camera(paramObj){
                             throw new Error("Something went badly wrong!")
                         }
                     }
-                    //console.log(q)
+
                     if(amplitude < cutoff){
                           q = featureBrightness*amplitude;
                     }
@@ -232,17 +241,42 @@ function Arr2d(n,m,val){
     }
 }
 
+// initialize an instrument panel
+function initializeControls(){
+    var signalSliderDiv = d3.select('#mainControls')
+        .append('div')
+        .attr('id', 'sliderDiv')
+        .append('p')
+        .text('Signal Peak Level, Photons')
 
+    var signalSlider = signalSliderDiv
+        .append('input')
+        .attr('type','range')
+        .attr('min', 1)
+        .attr('max',100)
+        .attr('value',5)
+        .attr('step', 1)
+        .style('width','300px')
+    
+    var signalSliderLabel = signalSliderDiv.append('p')
+    signalSliderLabel.text(signalSlider.attr('value'))
+    
+    signalSlider.on('input', function(){
+        self = this;
+        cameras.forEach(x => x.featureBrightness = Number(self.value));
+        signalSliderLabel.text(self.value);
+    });
+}
 
 // timing variables
 var start = null;
-var delta = 0
+var delta = 0;
 
 // add some sample cameras to the screen
 var cameras = [];
 
-for (var i=0; i<6; i++){
-    cameras.push(new Camera( {'readNoise':i} ));
+for (var i=0; i<10; i++){
+    cameras.push(new Camera( {'readNoise':i, 'containerDivID' : 'mainContainer'} ));
 }
 
 function startAnimation(timestamp) {
@@ -251,12 +285,22 @@ function startAnimation(timestamp) {
   window.requestAnimationFrame(animate);
 }
 
+function modRange(a, lowerLim, upperLim){
+    if (a > upperLim){
+        return lowerLim;
+    }
+    if (a < lowerLim ){
+        return upperLim;
+    }
+    return a;
+}
+
 function animate(){
     delta++;
     if (delta > 5){
         delta = 0;
-        objPos[0] = (objPos[0] + Math.random() - 0.5) % 64;
-        objPos[1] = (objPos[1] + Math.random() - 0.5) % 64;
+        objPos[0] = modRange( objPos[0] + speedMultiplier * (Math.random() - 0.5), -20, 20);
+        objPos[1] = modRange( objPos[1] + speedMultiplier * (Math.random() - 0.5), -20, 20);
 
         cameras.forEach(x=>x.updateData());
         cameras.forEach(x=>x.draw());
@@ -264,4 +308,5 @@ function animate(){
     window.requestAnimationFrame(animate);
 }
 
-startAnimation()
+initializeControls();
+startAnimation();
