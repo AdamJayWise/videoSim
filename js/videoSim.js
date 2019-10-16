@@ -3,7 +3,7 @@ console.log('videoSim.js')
 
 var objPos = [0,0];
 var featureBrightness = 10;
-var speedMultiplier = 2;
+var speedMultiplier = 0.5;
 
 // overall idea...
 // I want one or more camera objects, each one has an image object which it displays
@@ -83,6 +83,7 @@ function Camera(paramObj){
     self.CIC = 0; // CIC in events / pixel / frame
     self.offset = 2; // offset in counts for the fake ADC
     self.featureBrightness = 5; // brightness of image feature
+    self.featureSigma = 10; // FWHM of image feature
 
     if (paramObj.containerDivID){
         self.div = d3.select('#' + paramObj.containerDivID).append('div');
@@ -147,7 +148,7 @@ function Camera(paramObj){
             var offsetY = Math.floor(self.yPixels/2)
             var featureSize = 15;
             var featureBrightness = self.featureBrightness  ;
-            var fSigma = 3; //feature sigma
+            var fSigma = self.featureSigma; //feature sigma
             var q = 0;
             for (var i = 0; i < self.xPixels; i++){
                 for (var j = 0 ; j < self.yPixels; j++){
