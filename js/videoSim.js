@@ -13,6 +13,14 @@ var objPos = [0,0];
 // Knuth low-lambda Poisson random sample generator
 function poissonSample( lambda = 1, numSamples = 1 ){
     var output = []
+
+    // if lambda = 0, return array of zeros
+    if (lambda <= 0 || isNaN(lambda)){
+        output.length = numSamples;
+        output.fill(0)
+        return output
+    }
+
     var l = Math.exp(-lambda);
     var k = 0;
     var p = 1;
@@ -23,7 +31,7 @@ function poissonSample( lambda = 1, numSamples = 1 ){
             k++;
             p = p*Math.random();
         }
-        output.push(k-1);
+        output.push( Math.max(k-1,0));
     }
     return output;
 }
@@ -64,21 +72,26 @@ function Camera(paramObj){
         console.log('setting parameters');
         self.name = 'Generic Camera'
         self.displayScale = 4; // scale factor for displaying image on screen
-        self.xPixels = 64; // number of pixels in x dimension
-        self.yPixels = 64; // number of pixels in y dimension
+        self.xPixels = 40; // number of pixels in x dimension
+        self.yPixels = 40; // number of pixels in y dimension
         self.xPixelSize = 13; // x pixel size in microns
         self.yPixelSize = 13; // y pixel size in microns
         self.readNoise = 2; // rms read noise in electrons
-        self.CIC = 0.005; // CIC in events / pixel / frame
+        self.CIC = 0; // CIC in events / pixel / frame
         self.offset = 2; // offset in counts for the fake ADC
+        self.featureBrightness = 5; // brightness of image feature
     }
     
+    self.div = d3.select('body').append('div')
     // add a canvas to the document to display this data
-    self.canvas  = d3.select('body')
+    self.canvas  = self.div
                     .append('canvas')
                     .attr('width', self.displayScale * self.xPixels + ' px')
                     .attr('height', self.displayScale * self.yPixels + ' px')
                     .style('border','3px solid black')
+
+    
+    self.div.append('p').style('margin','0 0 10px 0').text('Read Noise: ' + self.readNoise)
 
 
     self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
@@ -99,7 +112,7 @@ function Camera(paramObj){
         }
 
         // right now, this adds a square feature to the random readout noise data
-        if (1==0){
+        if (0){
             var offsetX = Math.floor(self.xPixelSize * self.displayScale / 2);
             var offsetY = Math.floor(self.xPixelSize * self.displayScale / 2);
             var featureSize = 15;
@@ -115,16 +128,31 @@ function Camera(paramObj){
         // -------- end add square
 
         // right now, this adds a gauss feature to the random readout noise data
-        if (1==1){
-            var offsetX = 32;
-            var offsetY = 32;
+        if (1){
+            var offsetX = Math.floor(self.xPixels/2);
+            var offsetY = Math.floor(self.yPixels/2)
             var featureSize = 15;
-            var featureBrightness = 6  ;
-            var q;
+            var featureBrightness = self.featureBrightness  ;
+            var fSigma = 9; //feature sigma
+            var q = 0;
             for (var i = 0; i < self.xPixels; i++){
                 for (var j = 0 ; j < self.yPixels; j++){
-                    var radius = Math.exp( -1 * Math.sqrt( ((j-offsetY + objPos[0])**2) + (i - offsetX + objPos[1])**2 ) / 3 );
-                    q = poissonSample(featureBrightness * radius ,1)[0];
+                    var r = Math.sqrt( (j - offsetY + objPos[0])**2 + (i - offsetX + objPos[1])**2 )
+                    var amplitude = Math.exp( -1 * (r**2) / fSigma );
+                    
+                    var cutoff = 0;
+                    if(amplitude >= cutoff){
+                        q = poissonSample(featureBrightness * amplitude, 1)[0];
+                        if (q<0){
+                            console.log(amplitude, q);
+                            throw new Error("Something went badly wrong!")
+                        }
+                    }
+                    //console.log(q)
+                    if(amplitude < cutoff){
+                          q = featureBrightness*amplitude;
+                    }
+                        
                     self.simImage.set(i,j, q + self.simImage.get(i,j) );
                 }
             }
@@ -136,8 +164,8 @@ function Camera(paramObj){
     this.draw = function(){
         var arr = self.simImage;
         var scale = 1;
-        var arrMax = 15;//Math.max(...arr.data);
-        var arrMin = 0;//Math.min(...arr.data);
+        var arrMax = self.offset + 2*self.readNoise + self.featureBrightness;//Math.max(...arr.data);
+        var arrMin = self.offset - 2*self.readNoise;//Math.min(...arr.data);
         var arrRange = arrMax - arrMin;
 
         var canvas = this.canvas._groups[0][0];
@@ -201,22 +229,17 @@ function Arr2d(n,m,val){
 
 
 
-// manually add an animated canvas to the array
-
+// timing variables
 var start = null;
 var delta = 0
-var h = 128;
-var r = generateRandomArray(h,h);
 
-var cam1 = new Camera();
-var cam2 = new Camera();
-var cam3 = new Camera();
+// add some sample cameras to the screen
+var cameras = [];
 
-cam1.readNoise = 1;
-cam2.readNoise = 3;
-cam3.readNoise = 6;
-
-var cameras = [cam1, cam2, cam3];
+for (var i=0; i<6; i++){
+    cameras.push(new Camera());
+    cameras[i].readNoise = i*1;
+}
 
 function startAnimation(timestamp) {
   if (!start) start = timestamp;
@@ -226,7 +249,7 @@ function startAnimation(timestamp) {
 
 function animate(){
     delta++;
-    if (delta > 0){
+    if (delta > 5){
         delta = 0;
         objPos[0] = (objPos[0] + Math.random() - 0.5) % 64;
         objPos[1] = (objPos[1] + Math.random() - 0.5) % 64;

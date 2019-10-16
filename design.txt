@@ -1,0 +1,25 @@
+So I want to be able to open multiple video windows, representing the view of several different cameras with different sensors
+each one will represent the ground truth image happening in some system, static to start but with the option to view a time-dependent sample.
+
+The static scene will be a few blobs, or maybe a resolution target of some sort?  
+
+so there will be a single ground truth image object, that has the real data in there?
+    - there will be a high-res matrix of the image data, oversampled compared to the max res by some factor (4-6x?)
+    - each matrix cell has the # of photons/sec in there
+
+and there's a single clock that runs, and send a timestep to each sensor that might trigger an update
+
+each camera has a set
+    - framerate
+    - exposure time
+    - quantum efficiency
+    - read noise
+    - dark noise
+
+How will i handle EM gain(?)
+
+so to generate an image, each camera object will peek at the data in the image object, bin as needed, and then multiply by it's exposure time.
+
+So what's the first task?
+- make a class Camera that has height, width, pixel size, noise 
+- make an Image class that has data to use... maybe gaussian
