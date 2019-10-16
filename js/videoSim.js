@@ -68,19 +68,24 @@ function randnSample(nSamples = 1, mu = 0, sigma = 10) {
 
 function Camera(paramObj){
     var self = this;
-    if (!paramObj){
-        console.log('setting parameters');
-        self.name = 'Generic Camera'
-        self.displayScale = 4; // scale factor for displaying image on screen
-        self.xPixels = 40; // number of pixels in x dimension
-        self.yPixels = 40; // number of pixels in y dimension
-        self.xPixelSize = 13; // x pixel size in microns
-        self.yPixelSize = 13; // y pixel size in microns
-        self.readNoise = 2; // rms read noise in electrons
-        self.CIC = 0; // CIC in events / pixel / frame
-        self.offset = 2; // offset in counts for the fake ADC
-        self.featureBrightness = 5; // brightness of image feature
+    
+    //default parameters
+    console.log('setting parameters');
+    self.name = 'Generic Camera'
+    self.displayScale = 4; // scale factor for displaying image on screen
+    self.xPixels = 40; // number of pixels in x dimension
+    self.yPixels = 40; // number of pixels in y dimension
+    self.xPixelSize = 13; // x pixel size in microns
+    self.yPixelSize = 13; // y pixel size in microns
+    self.readNoise = 2; // rms read noise in electrons
+    self.CIC = 0; // CIC in events / pixel / frame
+    self.offset = 2; // offset in counts for the fake ADC
+    self.featureBrightness = 5; // brightness of image feature
+
+    if (paramObj){
+        Object.keys(paramObj).forEach(function(k){self[k]=paramObj[k]})
     }
+    
     
     self.div = d3.select('body').append('div')
     // add a canvas to the document to display this data
@@ -91,7 +96,7 @@ function Camera(paramObj){
                     .style('border','3px solid black')
 
     
-    self.div.append('p').style('margin','0 0 10px 0').text('Read Noise: ' + self.readNoise)
+    self.div.append('p').style('margin','0 0 10px 0').html('Read Noise: ' + self.readNoise + ' e<sup>-</sup> RMS')
 
 
     self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
@@ -237,8 +242,7 @@ var delta = 0
 var cameras = [];
 
 for (var i=0; i<6; i++){
-    cameras.push(new Camera());
-    cameras[i].readNoise = i*1;
+    cameras.push(new Camera( {'readNoise':i} ));
 }
 
 function startAnimation(timestamp) {
