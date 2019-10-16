@@ -244,29 +244,60 @@ function Arr2d(n,m,val){
 
 // initialize an instrument panel
 function initializeControls(){
-    var signalSliderDiv = d3.select('#mainControls')
-        .append('div')
-        .attr('id', 'sliderDiv')
-        .append('p')
-        .text('Signal Peak Level, Photons')
 
-    var signalSlider = signalSliderDiv
-        .append('input')
-        .attr('type','range')
-        .attr('min', 1)
-        .attr('max',100)
-        .attr('value',5)
-        .attr('step', 1)
-        .style('width','300px')
+    featureBrightnessConfig = {
+        controlName : 'featureBrightness',
+        labelText : 'Signal Peak Level, Photons',
+        parameter : 'featureBrightness',
+        min : 1,
+        max : 100,
+        defaultValue: 3
+    }
+
+    featureWidthConfig = {
+        controlName : 'featureWidth',
+        labelText : 'Feature FWHM, Px',
+        parameter : 'featureSigma',
+        min : 1,
+        max : 30,
+        defaultValue : 5
+    }
+
+    var createSlider = function(configObj){
+        var sliderDiv = d3.select('#mainControls')
+        .append('div')
+        .attr('class','container')
+        .attr('id', configObj.controlName+'sliderDiv')
+        .text(configObj.labelText)
+
+        var slider = sliderDiv
+            .append('input')
+            .attr('type','range')
+            .attr('min', configObj.min)
+            .attr('max', configObj.max)
+            .attr('value', configObj.defaultValue)
+            .attr('step', 1)
+            .style('width','300px')
+            .attr('class','slider')
+        
+        var sliderLabel = sliderDiv.append('p')
+        sliderLabel.text(configObj.defaultValue)
+        
+        var sliderCallBackFactory = function(configObj){
+            var f = function(){
+                self = this;
+                cameras.forEach(x => x[configObj['parameter']] = Number(self.value));
+                sliderLabel.text(self.value);
+            }
+            return f;
+        }
+        slider.on('input', sliderCallBackFactory(configObj));
+        return slider;
+    }
+
+    createSlider(featureBrightnessConfig);
+    createSlider(featureWidthConfig);
     
-    var signalSliderLabel = signalSliderDiv.append('p')
-    signalSliderLabel.text(signalSlider.attr('value'))
-    
-    signalSlider.on('input', function(){
-        self = this;
-        cameras.forEach(x => x.featureBrightness = Number(self.value));
-        signalSliderLabel.text(self.value);
-    });
 }
 
 // timing variables
