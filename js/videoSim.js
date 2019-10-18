@@ -74,7 +74,7 @@ function Camera(paramObj){
     //default parameters
     console.log('setting parameters');
     self.name = 'Generic Camera'
-    self.displayScale = 4; // scale factor for displaying image on screen
+    self.displayScale = 3; // scale factor for displaying image on screen
     self.xPixels = 40; // number of pixels in x dimension
     self.yPixels = 40; // number of pixels in y dimension
     self.xPixelSize = 13; // x pixel size in microns
@@ -84,6 +84,9 @@ function Camera(paramObj){
     self.offset = 2; // offset in counts for the fake ADC
     self.featureBrightness = 5; // brightness of image feature
     self.featureSigma = 10; // FWHM of image feature
+    self.QE = 1; // camera quantum efficiency (QE), range from 0 to 1
+    self.frameRateHz = 10; // camera framerate in relative units
+    self.emGain = 0; // em gain flag
 
     if (paramObj.containerDivID){
         self.div = d3.select('#' + paramObj.containerDivID).append('div');
@@ -106,7 +109,9 @@ function Camera(paramObj){
                     .style('border','3px solid black')
 
     
-    self.div.append('p').style('margin','0 0 10px 0').html('Read Noise: ' + self.readNoise + ' e<sup>-</sup> RMS')
+    self.div.append('p').style('margin','0').html(self.displayName)
+    self.div.append('p').style('margin','0').html('RoN: ' + self.readNoise + ' e<sup>-</sup> RMS')
+    self.div.append('p').style('margin','0').html('QE: ' + Math.round(self.QE*100) + '%')
 
 
     self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
@@ -157,15 +162,24 @@ function Camera(paramObj){
                     
                     var cutoff = 0;
                     if(amplitude >= cutoff){
-                        q = poissonSample(featureBrightness * amplitude, 1)[0];
+                        if (self.emGain == 0){
+                            q = poissonSample( self.QE * featureBrightness * amplitude, 1)[0];
+                        }
+
+                        if (self.emGain == 1){
+                            q = poissonSample( self.QE * featureBrightness * amplitude, 1)[0];
+                            q = poissonSample( q , 1)[0];
+                        }
+
                         if (q<0){
                             console.log(amplitude, q);
                             throw new Error("Something went badly wrong!")
                         }
                     }
 
+                    // 
                     if(amplitude < cutoff){
-                          q = featureBrightness*amplitude;
+                          q = self.QE * featureBrightness * amplitude;
                     }
                         
                     self.simImage.set(i,j, q + self.simImage.get(i,j) );
@@ -179,7 +193,7 @@ function Camera(paramObj){
     this.draw = function(){
         var arr = self.simImage;
         var scale = 1;
-        var arrMax = self.offset + 2*self.readNoise + self.featureBrightness;//Math.max(...arr.data);
+        var arrMax = self.offset + 2*self.readNoise + self.QE * self.featureBrightness + 0.5 * Math.sqrt(self.QE * self.featureBrightness);//Math.max(...arr.data);
         var arrMin = self.offset - 2*self.readNoise;//Math.min(...arr.data);
         var arrRange = arrMax - arrMin;
 
@@ -280,7 +294,7 @@ function initializeControls(){
             .style('width','300px')
             .attr('class','slider')
         
-        var sliderLabel = sliderDiv.append('p')
+        var sliderLabel = sliderDiv.append('p').style('margin','0')
         sliderLabel.text(configObj.defaultValue)
         
         var sliderCallBackFactory = function(configObj){
@@ -288,6 +302,8 @@ function initializeControls(){
                 self = this;
                 cameras.forEach(x => x[configObj['parameter']] = Number(self.value));
                 sliderLabel.text(self.value);
+                cameras.forEach(x=>x.updateData());
+                cameras.forEach(x=>x.draw());
             }
             return f;
         }
@@ -307,10 +323,84 @@ var delta = 0;
 // add some sample cameras to the screen
 var cameras = [];
 
-for (var i=0; i<10; i++){
-    cameras.push(new Camera( {'readNoise':i, 'containerDivID' : 'mainContainer'} ));
+// show different cameras
+if (1){
+
+    d3.select('#mainContainer')
+        .append('div')
+        .attr('id','subContainer')
+        .style('display','flex')
+
+    var idus420 = {readNoise : 10,
+                     QE : 0.95,
+                     frameRateHz : 0.34,
+                    containerDivID : 'subContainer',
+                    displayName : 'Idus 420 @ 100KHz'}
+    cameras.push(new Camera(idus420))
+
+    var newton971 = {readNoise : 0.04,
+                     QE : 0.95,
+                     frameRateHz : 10,
+                    containerDivID : 'subContainer',
+                    emGain : 1, 
+                    displayName: 'Newton 971'}
+    cameras.push(new Camera(newton971))
+
+    var iXon888 = {readNoise : 0.13,
+        QE : 0.95,
+        CIC : 0.005,
+        frameRateHz : 26,
+        emGain : 1,
+       containerDivID : 'subContainer',
+       displayName: 'iXon Ultra 888'}
+    cameras.push(new Camera(iXon888))
+
+    var zyla55UsbGlobal = {readNoise : 1.6,
+        QE : 0.6,
+        CIC : 0,
+        frameRateHz : 75,
+       containerDivID : 'subContainer',
+       displayName: 'Zyla 5.5 10-Tap'}
+    cameras.push(new Camera(zyla55UsbGlobal))
+
+    var newCam = {readNoise : 1.6,
+        QE : 0.95,
+        CIC : 0,
+        frameRateHz : 24,
+       containerDivID : 'subContainer',
+       displayName: 'Sona'}
+    cameras.push(new Camera(newCam))
+
+    // ikon m 934
+    var newCam = {readNoise : 11.6,
+        QE : 0.95,
+        CIC : 0,
+        frameRateHz : 2.6,
+       containerDivID : 'subContainer',
+       displayName: 'iKon-M 934 @ 3MHz'}
+    cameras.push(new Camera(newCam))
 }
 
+// set up a matrix of parameters
+if (0){
+    var numRows = 3;
+    var numCols = 4;
+
+    for (var i = 0; i < numRows; i++){
+        d3.select('#mainContainer')
+            .append('div')
+            .attr('id','subContainer'+i)
+            .style('display','flex')
+            .attr('class','subContainer')
+    }
+
+    for (var i=0; i<numRows; i++){
+        for (var j = 0; j < numCols; j++){
+            cameras.push(new Camera( {'readNoise':i*1, 'QE': 1 - j * 0.2, 'containerDivID' : 'subContainer'+i} ));
+        }
+    }
+}
+ 
 function startAnimation(timestamp) {
   if (!start) start = timestamp;
   start = timestamp;
@@ -327,18 +417,29 @@ function modRange(a, lowerLim, upperLim){
     return a;
 }
 
+var frameRateMultiplier = Math.min(...cameras.map(x=>(1/x.frameRateHz)));
+// animate cameras
 function animate(){
     delta++;
-    if (delta > 5){
-        delta = 0;
+    if (1){
+        //delta = 0;
         objPos[0] = modRange( objPos[0] + speedMultiplier * (Math.random() - 0.5), -20, 20);
         objPos[1] = modRange( objPos[1] + speedMultiplier * (Math.random() - 0.5), -20, 20);
 
-        cameras.forEach(x=>x.updateData());
-        cameras.forEach(x=>x.draw());
+        function testFrameRate(cam){
+            if ( (delta % Math.round(1/cam.frameRateHz / frameRateMultiplier) == 0) || delta == 1 ){
+                cam.updateData();
+                cam.draw();
+            }
+        }
+
+        //cameras.forEach(x=>x.updateData());
+        //cameras.forEach(x=>x.draw());
+        cameras.forEach(testFrameRate)
     }
     window.requestAnimationFrame(animate);
 }
 
+// set up controls and start the animation process
 initializeControls();
 startAnimation();
