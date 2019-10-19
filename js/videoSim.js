@@ -1,9 +1,9 @@
 console.log('videoSim.js')
 
-
-var objPos = [0,0];
-var featureBrightness = 10;
-var speedMultiplier = 0.5;
+// global variables!
+var objPos = [0,0]; // x,y position of the feature in pixels
+var featureBrightness = 10; // peak brightness of the feature in photons / counts / whatever
+var speedMultiplier = 0.5; // fudge factor for random walk speed of the feature
 
 // overall idea...
 // I want one or more camera objects, each one has an image object which it displays
@@ -75,8 +75,8 @@ function Camera(paramObj){
     console.log('setting parameters');
     self.name = 'Generic Camera'
     self.displayScale = 3; // scale factor for displaying image on screen
-    self.xPixels = 40; // number of pixels in x dimension
-    self.yPixels = 40; // number of pixels in y dimension
+    self.xPixels = 64; // number of pixels in x dimension
+    self.yPixels = 64; // number of pixels in y dimension
     self.xPixelSize = 13; // x pixel size in microns
     self.yPixelSize = 13; // y pixel size in microns
     self.readNoise = 2; // rms read noise in electrons
@@ -87,6 +87,8 @@ function Camera(paramObj){
     self.QE = 1; // camera quantum efficiency (QE), range from 0 to 1
     self.frameRateHz = 10; // camera framerate in relative units
     self.emGain = 0; // em gain flag
+    self.model = models['BV']; // what chip variant
+    self.wavelength = 500; // wavelength of light incident on camera, in nm
 
     if (paramObj.containerDivID){
         self.div = d3.select('#' + paramObj.containerDivID).append('div');
@@ -109,14 +111,36 @@ function Camera(paramObj){
                     .style('border','3px solid black')
 
     
-    self.div.append('p').style('margin','0').html(self.displayName)
-    self.div.append('p').style('margin','0').html('RoN: ' + self.readNoise + ' e<sup>-</sup> RMS')
-    self.div.append('p').style('margin','0').html('QE: ' + Math.round(self.QE*100) + '%')
+    self.div.append('p')
+        .style('margin','0')
+        .html(self.displayName)
+        .attr('class','windowLabel')
+        .attr('class','nameLabel')
+    
+    self.div.append('p')
+        .style('margin','0')
+        .html(self.readNoise + ' e<sup>-</sup> Read Noise')
+        .attr('class','windowLabel')
+    
+    var QElabel = self.div.append('p')
+        .style('margin','0')
+        .html(Math.round(self.QE*100) + '% QE')
+        .attr('class','windowLabel')
+    
+    self.updateQELabel = function(n){
+        QElabel.html(Math.round(self.QE*100) + '% QE')
+    }
 
 
     self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
 
     this.updateData = function(){
+
+        self.QE = self.model.getQE(self.wavelength);
+        if(!self.QE){
+            self.QE = 0;
+        }
+        self.updateQELabel(self.QE);
 
         // start with a simple background of read noise, offset by 2 counts
         self.simImage.data = randnSample(numSamples = self.xPixels * self.yPixels, mu = self.offset, sigma = self.readNoise);
@@ -160,8 +184,8 @@ function Camera(paramObj){
                     var r = Math.sqrt( (j - offsetY + objPos[0])**2 + (i - offsetX + objPos[1])**2 )
                     var amplitude = Math.exp( -1 * (r**2) / fSigma );
                     
-                    var cutoff = 0;
-                    if(amplitude >= cutoff){
+                    var cutoff = 0.01;
+                    if(amplitude*featureBrightness >= cutoff){
                         if (self.emGain == 0){
                             q = poissonSample( self.QE * featureBrightness * amplitude, 1)[0];
                         }
@@ -194,7 +218,7 @@ function Camera(paramObj){
         var arr = self.simImage;
         var scale = 1;
         var arrMax = self.offset + 2*self.readNoise + self.QE * self.featureBrightness + 0.5 * Math.sqrt(self.QE * self.featureBrightness);//Math.max(...arr.data);
-        var arrMin = self.offset - 2*self.readNoise;//Math.min(...arr.data);
+        var arrMin = self.offset - 2*self.readNoise;
         var arrRange = arrMax - arrMin;
 
         var canvas = this.canvas._groups[0][0];
@@ -277,12 +301,25 @@ function initializeControls(){
         defaultValue : 5
     }
 
+    wavelengthConfig = {
+        controlName : 'wavelength',
+        labelText : 'Wavelength, nm',
+        parameter : 'wavelength',
+        min : 300,
+        max : 900,
+        defaultValue : 500
+    }
+
     var createSlider = function(configObj){
         var sliderDiv = d3.select('#mainControls')
         .append('div')
         .attr('class','container')
+        .style('margin','5px 0 5px 0')
         .attr('id', configObj.controlName+'sliderDiv')
-        .text(configObj.labelText)
+        .text(configObj.labelText + ' - ')
+
+        var sliderLabel = sliderDiv.append('span').style('font-weight','bold').style('margin','0 5px 0 5px')
+        sliderLabel.text(configObj.defaultValue)
 
         var slider = sliderDiv
             .append('input')
@@ -294,8 +331,7 @@ function initializeControls(){
             .style('width','300px')
             .attr('class','slider')
         
-        var sliderLabel = sliderDiv.append('p').style('margin','0')
-        sliderLabel.text(configObj.defaultValue)
+
         
         var sliderCallBackFactory = function(configObj){
             var f = function(){
@@ -313,6 +349,7 @@ function initializeControls(){
 
     createSlider(featureBrightnessConfig);
     createSlider(featureWidthConfig);
+    createSlider(wavelengthConfig);
     
 }
 
@@ -335,7 +372,7 @@ if (1){
                      QE : 0.95,
                      frameRateHz : 0.34,
                     containerDivID : 'subContainer',
-                    displayName : 'Idus 420 @ 100KHz'}
+                    displayName : 'Idus 420 BEX2-DD @ 100KHz'}
     cameras.push(new Camera(idus420))
 
     var newton971 = {readNoise : 0.04,
@@ -343,7 +380,7 @@ if (1){
                      frameRateHz : 10,
                     containerDivID : 'subContainer',
                     emGain : 1, 
-                    displayName: 'Newton 971'}
+                    displayName: 'Newton 971 BV'}
     cameras.push(new Camera(newton971))
 
     var iXon888 = {readNoise : 0.13,
@@ -352,7 +389,8 @@ if (1){
         frameRateHz : 26,
         emGain : 1,
        containerDivID : 'subContainer',
-       displayName: 'iXon Ultra 888'}
+       model : models['BV'],
+       displayName: 'iXon Ultra 888 BV'}
     cameras.push(new Camera(iXon888))
 
     var zyla55UsbGlobal = {readNoise : 1.6,
@@ -360,6 +398,7 @@ if (1){
         CIC : 0,
         frameRateHz : 75,
        containerDivID : 'subContainer',
+       model : models['Zyla 5.5'],
        displayName: 'Zyla 5.5 10-Tap'}
     cameras.push(new Camera(zyla55UsbGlobal))
 
@@ -368,7 +407,8 @@ if (1){
         CIC : 0,
         frameRateHz : 24,
        containerDivID : 'subContainer',
-       displayName: 'Sona'}
+       model : models['Sona'],
+       displayName: 'Sona 4.2'}
     cameras.push(new Camera(newCam))
 
     // ikon m 934
@@ -377,7 +417,8 @@ if (1){
         CIC : 0,
         frameRateHz : 2.6,
        containerDivID : 'subContainer',
-       displayName: 'iKon-M 934 @ 3MHz'}
+       model : models['BEX2-DD'],
+       displayName: 'iKon-M 934 BEX2-DD @ 3MHz'}
     cameras.push(new Camera(newCam))
 }
 
