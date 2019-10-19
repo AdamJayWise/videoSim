@@ -10,12 +10,13 @@
     .container {
         display: flex;
         flex-wrap: wrap;
+        width: 100%;
 
     }
 
     .subContainer {
-        -webkit-flex-basis: 100%; /* Safari 6.1+ */
-        flex-basis: 100%;
+        display: flex;
+        flex-wrap: wrap;
     }
 
     .windowLabel {
@@ -59,16 +60,46 @@
   cursor: pointer;
 }
 
+.instrumentPanel{
+    border: 1px solid black;
+    padding: 4px;
+}
+
+.explainerBox{
+    border: 1px solid black;
+    font-size: 14pt;
+    margin: 5px;
+    padding: 5px;
+}
+
+.explainerBox .emphatic {
+    font-weight: bold;
+    font-size: 18pt;
+}
+
+label {
+    width : 100%;
+    margin : 5px;
+    font-size : 14pt;
+}
+
 </style>
 	
 </head>
 
 <body>
-    <p>Video Sim - Adam Wise 2019   </p>
+    <p>Video Sim - Fast Imaging - Adam Wise 2019   </p>
 
     <div class = "instrumentPanel" id = "mainControls"></div>
     <div class = "container" id = "mainContainer">
     </div>
+
+<div class = 'explainerBox'>
+    <span class = 'emphatic'>What is this?</span> <span class = 'content'>Above are windows simulating a sub-area of each camera, acquiring 16-bit image
+    data as quickly as possible.  Each window shows what a small Gaussian spot focused on the camera would look like, with the size
+    of the spot scaled to match the cameras pixel size.  "Signal peak" is the number of photons per pixel at the brightest part
+    of the spot.  Frame rates are relative. </span>
+</div>
 
 </body>
 

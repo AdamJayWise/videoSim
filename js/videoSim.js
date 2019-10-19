@@ -11,6 +11,10 @@ var speedMultiplier = 0.5; // fudge factor for random walk speed of the feature
 // let me start by creating a way to display the image, and show an animated image of a
 // HxW screen with poisson sampling
 
+// ok now for the next feature - a switch that will change between "fast imaging", and "long exposures"
+// the "fast imaging" mode will give a qualitative idea for real-time imaging
+// the "slow imaging / long exposure" mode will give 
+// maybe a spectra mode as well, which uses a set height and calculates the spectrum
 
 // Knuth low-lambda Poisson random sample generator
 function poissonSample( lambda = 1, numSamples = 1 ){
@@ -79,16 +83,28 @@ function Camera(paramObj){
     self.yPixels = 64; // number of pixels in y dimension
     self.xPixelSize = 13; // x pixel size in microns
     self.yPixelSize = 13; // y pixel size in microns
+    
     self.readNoise = 2; // rms read noise in electrons
+    self.readNoiseSlow = 1; // rms read noise for slow readout
+    self.readNoiseFast = 3; // rms read noise for slowest readout
+    
     self.CIC = 0; // CIC in events / pixel / frame
     self.offset = 2; // offset in counts for the fake ADC
     self.featureBrightness = 5; // brightness of image feature
     self.featureSigma = 10; // FWHM of image feature
     self.QE = 1; // camera quantum efficiency (QE), range from 0 to 1
+    
     self.frameRateHz = 10; // camera framerate in relative units
+    self.frameRateHzFast = 20; // camera framerate for fast mode
+    self.frameRateHzSlow = 5; // camera framerate for slow mode
+
+    self.darkCurrent = 0.001; // camera dark current in e/pix/sec
+
     self.emGain = 0; // em gain flag
     self.model = models['BV']; // what chip variant
     self.wavelength = 500; // wavelength of light incident on camera, in nm
+    self.mode = 'fast'; // fast or slow imaging mode
+    self.exposureTime = 30; // exposure time in seconds
 
     if (paramObj.containerDivID){
         self.div = d3.select('#' + paramObj.containerDivID).append('div');
@@ -117,7 +133,7 @@ function Camera(paramObj){
         .attr('class','windowLabel')
         .attr('class','nameLabel')
     
-    self.div.append('p')
+    var readNoiseLabel = self.div.append('p')
         .style('margin','0')
         .html(self.readNoise + ' e<sup>-</sup> Read Noise')
         .attr('class','windowLabel')
@@ -131,6 +147,10 @@ function Camera(paramObj){
         QElabel.html(Math.round(self.QE*100) + '% QE')
     }
 
+    self.updateReadNoiseLabel = function(n){
+        readNoiseLabel.html(self.readNoise + ' e<sup>-</sup> Read Noise')
+    }
+
 
     self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
 
@@ -141,6 +161,7 @@ function Camera(paramObj){
             self.QE = 0;
         }
         self.updateQELabel(self.QE);
+        
 
         // start with a simple background of read noise, offset by 2 counts
         self.simImage.data = randnSample(numSamples = self.xPixels * self.yPixels, mu = self.offset, sigma = self.readNoise);
@@ -152,7 +173,7 @@ function Camera(paramObj){
         for (var i = 0; i < nCicPoints; i++){
             var xCoord = Math.floor( Math.random() * self.xPixels );
             var yCoord = Math.floor( Math.random() * self.yPixels );
-            self.simImage.set(xCoord, yCoord, self.offset + 6*self.readNoise);
+            self.simImage.set(xCoord, yCoord, self.offset + (1+5*Math.random()));
         }
 
         // right now, this adds a square feature to the random readout noise data
@@ -195,6 +216,9 @@ function Camera(paramObj){
                             q = poissonSample( q , 1)[0];
                         }
 
+                        // add dark current if in slow mode
+
+
                         if (q<0){
                             console.log(amplitude, q);
                             throw new Error("Something went badly wrong!")
@@ -206,7 +230,13 @@ function Camera(paramObj){
                           q = self.QE * featureBrightness * amplitude;
                     }
                         
-                    self.simImage.set(i,j, q + self.simImage.get(i,j) );
+                    var darkCounts = 0;
+                    
+                    if (self.mode == 'Slow'){
+                        darkCounts =  poissonSample(self.darkCurrent * self.exposureTime, 1)[0]
+                    }
+
+                    self.simImage.set(i,j, q + darkCounts + self.simImage.get(i,j) );
                 }
             }
         }
@@ -217,9 +247,20 @@ function Camera(paramObj){
     this.draw = function(){
         var arr = self.simImage;
         var scale = 1;
-        var arrMax = self.offset + 2*self.readNoise + self.QE * self.featureBrightness + 0.5 * Math.sqrt(self.QE * self.featureBrightness);//Math.max(...arr.data);
+
+
+        var arrMax = self.offset + 2*self.readNoise + self.QE * self.featureBrightness + 0.5 * Math.sqrt(self.QE * self.featureBrightness );//Math.max(...arr.data);
         var arrMin = self.offset - 2*self.readNoise;
         var arrRange = arrMax - arrMin;
+
+        // if in slow imaging mode, include the dark current in the color scale calculations
+        if (self.mode == 'Slow'){
+            var darkCounts = self.darkCurrent * self.exposureTime;
+            arrMax = self.offset + 2*self.readNoise + self.QE * self.featureBrightness + 0.5 * Math.sqrt(self.QE * self.featureBrightness ) + darkCounts;//Math.max(...arr.data);
+            arrMin = self.offset - 2*self.readNoise - Math.sqrt(darkCounts) + darkCounts;
+            arrRange = arrMax - arrMin;
+        }
+
 
         var canvas = this.canvas._groups[0][0];
         var context = canvas.getContext("2d");
@@ -306,7 +347,7 @@ function initializeControls(){
         labelText : 'Wavelength, nm',
         parameter : 'wavelength',
         min : 300,
-        max : 900,
+        max : 1000,
         defaultValue : 500
     }
 
@@ -350,6 +391,62 @@ function initializeControls(){
     createSlider(featureBrightnessConfig);
     createSlider(featureWidthConfig);
     createSlider(wavelengthConfig);
+
+    var checkBoxDiv = d3.select('#mainControls')
+    .append('div')
+    .attr('class','container')
+    .style('margin','5px 0 5px 0')
+    .attr('id', 'checkBoxDiv')
+  
+checkBoxDiv
+    .append('label')
+    .text("Fast Mode - Max Frame Rate")
+    .append('input')
+    .attr('type','radio')
+    .attr('name','mode')
+    .attr('value','Fast')
+    .attr('id','Fast')
+    .attr('checked','true')
+
+checkBoxDiv
+    .append('label')
+    .text("Slow Mode - 30 Second Exposure")
+    .append('input')
+    .attr('type','radio')
+    .attr('name','mode')
+    .attr('value','Slow')
+    .attr('id','Slow')
+
+d3.selectAll('[type = radio]').on('change', function(){
+     var self = this;
+     cameras.forEach(x=>x.mode = this.value);
+
+     cameras.forEach( function(cam){
+         cam.readNoise = cam['readNoise'+self.value];
+         cam.frameRateHz = cam['frameRateHz'+self.value];
+         console.log(self.value);
+         cam.updateReadNoiseLabel();
+         cam.updateData();
+         cam.draw();
+     } );
+
+     // update the explainer box
+     if (self.value == 'Fast'){
+        d3.select('.explainerBox .content').html(`Above are windows simulating a sub-area of each camera, acquiring 16-bit image
+        data as quickly as possible.  Each window shows what a small Gaussian spot focused on the camera would look like, with the size
+        of the spot scaled to match the cameras pixel size.  Signal peak is the number of photons per pixel at the brightest part
+        of the spot.  Frame rates are relative.`)
+     }
+
+     if (self.value == 'Slow'){
+        d3.select('.explainerBox .content').html(`Above are windows simulating a sub-area of each camera, acquiring 16-bit image
+        data with a 30-second exposure.  Each window shows what a small Gaussian spot focused on the camera would look like, with the size
+        of the spot scaled to match the cameras pixel size.  Signal peak is the number of photons per pixel at the brightest part
+        of the spot.  Frame rates are relative.`)
+     }
+
+     
+    })
     
 }
 
@@ -368,57 +465,93 @@ if (1){
         .attr('id','subContainer')
         .style('display','flex')
 
-    var idus420 = {readNoise : 10,
-                     QE : 0.95,
-                     frameRateHz : 0.34,
-                    containerDivID : 'subContainer',
-                    displayName : 'Idus 420 BEX2-DD @ 100KHz'}
+    var idus420 = {
+        readNoise : 10,
+        readNoiseFast: 10,
+        readNoiseSlow: 4,
+        QE : 0.95,
+        frameRateHz : 0.34,
+        frameRateHzFast: 0.34,
+        frameRateHzSlow: 1,    
+        darkCurrent : 0.008,    
+        containerDivID : 'subContainer',
+        displayName : 'Idus 420 BEX2-DD'}
     cameras.push(new Camera(idus420))
 
-    var newton971 = {readNoise : 0.04,
-                     QE : 0.95,
-                     frameRateHz : 10,
-                    containerDivID : 'subContainer',
-                    emGain : 1, 
-                    displayName: 'Newton 971 BV'}
+    var newton971 = {
+        readNoise : 0.04,
+        readNoiseFast : 0.04,
+        readNoiseSlow : 0.0028,
+        QE : 0.95,
+        frameRateHz : 10,
+        frameRateHzFast : 10,
+        frameRateHzSlow : 1,
+        darkCurrent : 0.00020,
+        containerDivID : 'subContainer',
+        emGain : 1, 
+        displayName: 'Newton 971 BV'}
     cameras.push(new Camera(newton971))
 
-    var iXon888 = {readNoise : 0.13,
+    var iXon888 = {
+        readNoise : 0.13,
+        readNoiseFast: 0.13,
+        readNoiseSlow: 0.012,
         QE : 0.95,
         CIC : 0.005,
+        darkCurrent : 0.00011,
         frameRateHz : 26,
+        frameRateHzFast: 26,
+        frameRateHzSlow: 1,
         emGain : 1,
        containerDivID : 'subContainer',
        model : models['BV'],
        displayName: 'iXon Ultra 888 BV'}
     cameras.push(new Camera(iXon888))
 
-    var zyla55UsbGlobal = {readNoise : 1.6,
+    var newcam = {
+        readNoise : 1.6,
+        readNoiseFast : 1.6,
+        readNoiseSlow : 1.2,
         QE : 0.6,
         CIC : 0,
         frameRateHz : 75,
+        frameRateHzFast : 75,
+        frameRateHzSlow : 1,
+        darkCurrent : 0.019,
        containerDivID : 'subContainer',
        model : models['Zyla 5.5'],
        displayName: 'Zyla 5.5 10-Tap'}
-    cameras.push(new Camera(zyla55UsbGlobal))
+    cameras.push(new Camera(newcam))
 
-    var newCam = {readNoise : 1.6,
+    var newCam = {
+        readNoise : 1.6,
+        readNoiseFast : 1.6,
+        readNoiseSlow : 1.6,
         QE : 0.95,
         CIC : 0,
         frameRateHz : 24,
+        frameRateHzFast : 24,
+        frameRateHzSlow : 1,
+        darkCurrent : 0.2,
        containerDivID : 'subContainer',
        model : models['Sona'],
        displayName: 'Sona 4.2'}
     cameras.push(new Camera(newCam))
 
     // ikon m 934
-    var newCam = {readNoise : 11.6,
+    var newCam = {
+        readNoise : 11.6,
+        readNoiseFast : 11.6,
+        readNoiseSlow : 2.9,
+        darkCurrent : 0.00012,
         QE : 0.95,
         CIC : 0,
         frameRateHz : 2.6,
+        frameRateHzFast : 2.6,
+        frameRateHzSlow : 1 ,
        containerDivID : 'subContainer',
        model : models['BEX2-DD'],
-       displayName: 'iKon-M 934 BEX2-DD @ 3MHz'}
+       displayName: 'iKon-M 934 BEX2-DD'}
     cameras.push(new Camera(newCam))
 }
 
@@ -458,9 +591,10 @@ function modRange(a, lowerLim, upperLim){
     return a;
 }
 
-var frameRateMultiplier = Math.min(...cameras.map(x=>(1/x.frameRateHz)));
+
 // animate cameras
 function animate(){
+    var frameRateMultiplier = Math.min(...cameras.map(x=>(1/x.frameRateHz)));
     delta++;
     if (1){
         //delta = 0;
