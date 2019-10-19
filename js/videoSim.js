@@ -285,7 +285,7 @@ function initializeControls(){
 
     featureBrightnessConfig = {
         controlName : 'featureBrightness',
-        labelText : 'Signal Peak Level, Photons',
+        labelText : 'Signal Peak, Photons',
         parameter : 'featureBrightness',
         min : 1,
         max : 100,
@@ -464,8 +464,8 @@ function animate(){
     delta++;
     if (1){
         //delta = 0;
-        objPos[0] = modRange( objPos[0] + speedMultiplier * (Math.random() - 0.5), -20, 20);
-        objPos[1] = modRange( objPos[1] + speedMultiplier * (Math.random() - 0.5), -20, 20);
+        objPos[0] = modRange( objPos[0] + speedMultiplier * (Math.random() - 0.5), -32, 32);
+        objPos[1] = modRange( objPos[1] + speedMultiplier * (Math.random() - 0.5), -32, 32);
 
         function testFrameRate(cam){
             if ( (delta % Math.round(1/cam.frameRateHz / frameRateMultiplier) == 0) || delta == 1 ){
