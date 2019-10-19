@@ -107,10 +107,10 @@ function Camera(paramObj){
     self.exposureTime = 30; // exposure time in seconds
 
     if (paramObj.containerDivID){
-        self.div = d3.select('#' + paramObj.containerDivID).append('div');
+        self.div = d3.select('#' + paramObj.containerDivID).append('div').attr('class','cameraDiv');
     }
     else {
-        self.div = d3.select('body').append('div');
+        self.div = d3.select('body').append('div').attr('class','cameraDiv');
     }
 
     if (paramObj){
@@ -521,6 +521,21 @@ if (1){
        containerDivID : 'subContainer',
        model : models['Zyla 5.5'],
        displayName: 'Zyla 5.5 10-Tap'}
+    cameras.push(new Camera(newcam))
+
+    var newcam = {
+        readNoise : 1.3,
+        readNoiseFast : 1.3,
+        readNoiseSlow : 1.1 ,
+        QE : 0.83,
+        CIC : 0,
+        frameRateHz : 101,
+        frameRateHzFast : 101,
+        frameRateHzSlow : 1,
+        darkCurrent : 0.019,
+       containerDivID : 'subContainer',
+       model : models['Zyla 4.2 PLUS'],
+       displayName: 'Zyla 4.2+ 10-Tap'}
     cameras.push(new Camera(newcam))
 
     var newCam = {
