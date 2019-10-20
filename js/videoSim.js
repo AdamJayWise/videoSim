@@ -354,12 +354,13 @@ function initializeControls(){
     var createSlider = function(configObj){
         var sliderDiv = d3.select('#mainControls')
         .append('div')
-        .attr('class','container')
-        .style('margin','5px 0 5px 0')
+        .attr('class','sliderLabel')
         .attr('id', configObj.controlName+'sliderDiv')
         .text(configObj.labelText + ' - ')
 
-        var sliderLabel = sliderDiv.append('span').style('font-weight','bold').style('margin','0 5px 0 5px')
+        var sliderLabel = sliderDiv.append('span')
+            .attr('class','sliderLabel')
+
         sliderLabel.text(configObj.defaultValue)
 
         var slider = sliderDiv
@@ -373,7 +374,6 @@ function initializeControls(){
             .attr('class','slider')
         
 
-        
         var sliderCallBackFactory = function(configObj){
             var f = function(){
                 self = this;
@@ -392,15 +392,16 @@ function initializeControls(){
     createSlider(featureWidthConfig);
     createSlider(wavelengthConfig);
 
+    d3.select('#mainControls').append('hr')
+
     var checkBoxDiv = d3.select('#mainControls')
     .append('div')
-    .attr('class','container')
-    .style('margin','5px 0 5px 0')
+    .attr('class','sliderLabel')
     .attr('id', 'checkBoxDiv')
   
 checkBoxDiv
     .append('label')
-    .text("Fast Mode - Max Frame Rate")
+    .text("Fast Mode - Simulate Max Frame Rate")
     .append('input')
     .attr('type','radio')
     .attr('name','mode')
@@ -410,7 +411,7 @@ checkBoxDiv
 
 checkBoxDiv
     .append('label')
-    .text("Slow Mode - 30 Second Exposure")
+    .text("Slow Mode - Simulate 30 Second Exposure")
     .append('input')
     .attr('type','radio')
     .attr('name','mode')
@@ -442,7 +443,7 @@ d3.selectAll('[type = radio]').on('change', function(){
         d3.select('.explainerBox .content').html(`Above are windows simulating a sub-area of each camera, acquiring 16-bit image
         data with a 30-second exposure.  Each window shows what a small Gaussian spot focused on the camera would look like, with the size
         of the spot scaled to match the cameras pixel size.  Signal peak is the number of photons per pixel at the brightest part
-        of the spot.  Frame rates are relative.`)
+        of the spot.  Frame rates are equal, as exposure time >> readout time.`)
      }
 
      
