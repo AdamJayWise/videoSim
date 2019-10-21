@@ -116,12 +116,8 @@ function Camera(paramObj){
         Object.keys(paramObj).forEach(function(k){self[k]=paramObj[k]})
     }
     
-    if ( (self.xPixels > 100) || (self.yPixels > 100) ){
-        var localScale = self.pixelDecimation;
-        self.xPixels = Math.round(self.xPixels / localScale);
-        self.yPixels = Math.round(self.yPixels / localScale)
-    }
-    
+    self.xPixels = Math.round(self.xPixels / self.pixelDecimation);
+    self.yPixels = Math.round(self.yPixels / self.pixelDecimation)
     
     // add a canvas to the document to display this data
     self.canvas  = self.div
@@ -177,8 +173,8 @@ function Camera(paramObj){
         self.realImage = new Arr2d(self.xPixels, self.yPixels, 0);
         for (var i = 0; i < self.xPixels; i++){
             for (var j = 0; j < self.yPixels; j++){
-               v = ((Math.sin(0 + ( (i) *self.xPixelSize) / 20))+1) / 2; //+ Math.sin( (j * self.yPixelSize + 10) / 50)) + 1) / 2; 
-               w = ((Math.sin(0 + ( (j) *self.xPixelSize) / 20))+1) / 2;
+               v = ((Math.sin(0 + ( (i) * self.xPixelSize) / 42.5))+1) / 2;  
+               w = ((Math.sin(0 + ( (j) * self.yPixelSize) / 42.5))+1) / 2;
                self.realImage.set(i,j, v*w);
             }
         }
@@ -292,7 +288,6 @@ function Camera(paramObj){
 
     this.draw = function(){
         var arr = self.simImage;
-        var scale = 1;
 
         var areaFrac = 1;
         if (self.hasRealImage){
@@ -313,7 +308,7 @@ function Camera(paramObj){
 
         var canvas = this.canvas._groups[0][0];
         var context = canvas.getContext("2d");
-        var scale = Math.ceil(self.xPixelSize * self.displayScale);
+        var scale = self.xPixelSize * self.displayScale;
 
         context.lineWidth = 0;
         context.strokeStyle = 'none'
