@@ -16,6 +16,8 @@ var speedMultiplier = 0.5; // fudge factor for random walk speed of the feature
 // the "slow imaging / long exposure" mode will give 
 // maybe a spectra mode as well, which uses a set height and calculates the spectrum
 
+// ok - now, how to add a changeable 'resolution'
+
 // Knuth low-lambda Poisson random sample generator
 function poissonSample( lambda = 1, numSamples = 1 ){
     var output = []
@@ -40,11 +42,6 @@ function poissonSample( lambda = 1, numSamples = 1 ){
         output.push( Math.max(k-1,0));
     }
     return output;
-}
-
-function showArrayCanvas(arr){
-    
-    
 }
 
 
@@ -78,7 +75,7 @@ function Camera(paramObj){
     //default parameters
     console.log('setting parameters');
     self.name = 'Generic Camera'
-    self.displayScale = 3; // scale factor for displaying image on screen
+    self.displayScale = 0.115   ; // scale factor for displaying image on screen
     self.xPixels = 64; // number of pixels in x dimension
     self.yPixels = 64; // number of pixels in y dimension
     self.xPixelSize = 13; // x pixel size in microns
@@ -99,14 +96,16 @@ function Camera(paramObj){
     self.frameRateHzSlow = 5; // camera framerate for slow mode
 
     self.darkCurrent = 0.001; // camera dark current in e/pix/sec
-
     self.emGain = 0; // em gain flag
     self.model = models['BV']; // what chip variant
     self.wavelength = 500; // wavelength of light incident on camera, in nm
-    self.mode = 'fast'; // fast or slow imaging mode
+    self.mode = 'Fast'; // fast or slow imaging mode
     self.exposureTime = 30; // exposure time in seconds
 
-    if (paramObj.containerDivID){
+    self.pixelDecimation = 15; // factor to reduce resolution to ease display on a monitor
+    self.hasRealImage = true; // should this camera have another real image available?
+
+    if (paramObj){
         self.div = d3.select('#' + paramObj.containerDivID).append('div').attr('class','cameraDiv');
     }
     else {
@@ -117,13 +116,18 @@ function Camera(paramObj){
         Object.keys(paramObj).forEach(function(k){self[k]=paramObj[k]})
     }
     
+    if ( (self.xPixels > 100) || (self.yPixels > 100) ){
+        var localScale = self.pixelDecimation;
+        self.xPixels = Math.round(self.xPixels / localScale);
+        self.yPixels = Math.round(self.yPixels / localScale)
+    }
     
     
     // add a canvas to the document to display this data
     self.canvas  = self.div
                     .append('canvas')
-                    .attr('width', self.displayScale * self.xPixels + ' px')
-                    .attr('height', self.displayScale * self.yPixels + ' px')
+                    .attr('width', Math.round(self.displayScale * self.xPixelSize * self.xPixels) + ' px')
+                    .attr('height', Math.round(self.displayScale * self.yPixelSize * self.yPixels) + ' px')
                     .style('border','3px solid black')
 
     
@@ -142,17 +146,44 @@ function Camera(paramObj){
         .style('margin','0')
         .html(Math.round(self.QE*100) + '% QE')
         .attr('class','windowLabel')
+
+    var FPSlabel = self.div.append('p')
+        .style('margin','0')
+        .html(self.frameRateHz + ' FPS')
+        .attr('class','windowLabel')
     
     self.updateQELabel = function(n){
         QElabel.html(Math.round(self.QE*100) + '% QE')
     }
 
     self.updateReadNoiseLabel = function(n){
+        if (self.readNoise < 1){
+            readNoiseLabel.html('<1 e<sup>-</sup> Read Noise')
+            return
+        }
         readNoiseLabel.html(self.readNoise + ' e<sup>-</sup> Read Noise')
     }
 
+    self.updateFPSLabel = function(n){
+        FPSlabel.html(self.frameRateHz + ' FPS')
+    }
 
-    self.simImage = new Arr2d(n = self.xPixels, m = self.yPixels, val = 0)
+    // create image data
+    self.simImage = new Arr2d(self.xPixels, self.yPixels, 0)
+
+    if (self.hasRealImage){
+        var v = 0;
+        var w = 0;
+        self.realImage = new Arr2d(self.xPixels, self.yPixels, 0);
+        for (var i = 0; i < self.xPixels; i++){
+            for (var j = 0; j < self.yPixels; j++){
+               v = ((Math.sin(0 + ( (i) *self.xPixelSize) / 20))+1) / 2; //+ Math.sin( (j * self.yPixelSize + 10) / 50)) + 1) / 2; 
+               w = ((Math.sin(0 + ( (j) *self.xPixelSize) / 20))+1) / 2;
+               self.realImage.set(i,j, v*w);
+            }
+        }
+        
+    }
 
     this.updateData = function(){
 
@@ -192,8 +223,23 @@ function Camera(paramObj){
         }
         // -------- end add square
 
+        // generate data from 'real' image
+
+        if(self.hasRealImage){
+            var q;
+            var areaFrac = (self.xPixelSize * self.yPixelSize) / (16*16);
+            for (var i = 0; i < self.xPixels; i++){
+                for (var j = 0; j < self.yPixels; j++){
+
+                    q = poissonSample(self.featureBrightness * self.QE * areaFrac * self.realImage.get(i,j) , 1)[0];
+                    self.simImage.set(i,j, q + self.simImage.get(i,j));
+                }
+            }
+            return 0;
+        }
+
         // right now, this adds a gauss feature to the random readout noise data
-        if (1){
+        if (0){
             var offsetX = Math.floor(self.xPixels/2);
             var offsetY = Math.floor(self.yPixels/2)
             var featureSize = 15;
@@ -248,15 +294,18 @@ function Camera(paramObj){
         var arr = self.simImage;
         var scale = 1;
 
-
-        var arrMax = self.offset + 2*self.readNoise + self.QE * self.featureBrightness + 0.5 * Math.sqrt(self.QE * self.featureBrightness );//Math.max(...arr.data);
+        var areaFrac = 1;
+        if (self.hasRealImage){
+            areaFrac = (self.xPixelSize * self.yPixelSize) / (16*16);
+        } 
+        var arrMax = self.offset + 2*self.readNoise + self.QE  * self.featureBrightness * areaFrac + 0.5 * Math.sqrt(self.QE * areaFrac * self.featureBrightness );//Math.max(...arr.data);
         var arrMin = self.offset - 2*self.readNoise;
         var arrRange = arrMax - arrMin;
 
         // if in slow imaging mode, include the dark current in the color scale calculations
         if (self.mode == 'Slow'){
             var darkCounts = self.darkCurrent * self.exposureTime;
-            arrMax = self.offset + 2*self.readNoise + self.QE * self.featureBrightness + 0.5 * Math.sqrt(self.QE * self.featureBrightness ) + darkCounts;//Math.max(...arr.data);
+            arrMax = self.offset + 2*self.readNoise + self.QE * areaFrac * self.featureBrightness + 0.5 * Math.sqrt(self.QE * areaFrac * self.featureBrightness ) + darkCounts;//Math.max(...arr.data);
             arrMin = self.offset - 2*self.readNoise - Math.sqrt(darkCounts) + darkCounts;
             arrRange = arrMax - arrMin;
         }
@@ -264,25 +313,16 @@ function Camera(paramObj){
 
         var canvas = this.canvas._groups[0][0];
         var context = canvas.getContext("2d");
+        var scale = Math.ceil(self.xPixelSize * self.displayScale);
 
         context.lineWidth = 0;
         context.strokeStyle = 'none'
 
-        var m = arr.m;
-        var n = arr.n;
-        
-        // scale the data array to the canvas
-        if( canvas.height == canvas.width ){
-            scale = canvas.width / arr.m
-        }
-        else
-            var scale = 2;
-
-        for (var i=0; i<m; i++){
-            for (var j=0; j<n; j++){ 
+        for (var i = 0; i < self.xPixels; i++){
+            for (var j = 0; j < self.yPixels; j++){ 
                 var v = Math.round( 255*(arr.get(i,j)-arrMin)/arrRange );
                 context.fillStyle = `rgb(${v},${v},${v})`;
-                context.fillRect(i*scale, j*scale, scale, scale);
+                context.fillRect(i * scale, j * scale, scale, scale);
             }
         }
     }
@@ -304,11 +344,11 @@ function Arr2d(n,m,val){
     self.length = self.data.length;
     
     self.get = function(i,j){
-        return self.data[i*n + j];
+        return self.data[j*n + i];
     }
 
     self.set = function(i,j, v){
-        self.data[i*n + j] = v;
+        self.data[j*n + i] = v;
     }
 
     self.mapData = function(f){
@@ -389,7 +429,7 @@ function initializeControls(){
     }
 
     createSlider(featureBrightnessConfig);
-    createSlider(featureWidthConfig);
+    //createSlider(featureWidthConfig);
     createSlider(wavelengthConfig);
 
     d3.select('#mainControls').append('hr')
@@ -427,23 +467,24 @@ d3.selectAll('[type = radio]').on('change', function(){
          cam.frameRateHz = cam['frameRateHz'+self.value];
          console.log(self.value);
          cam.updateReadNoiseLabel();
+         cam.updateFPSLabel();
          cam.updateData();
          cam.draw();
      } );
 
      // update the explainer box
      if (self.value == 'Fast'){
-        d3.select('.explainerBox .content').html(`Above are windows simulating a sub-area of each camera, acquiring 16-bit image
-        data as quickly as possible.  Each window shows what a small Gaussian spot focused on the camera would look like, with the size
-        of the spot scaled to match the cameras pixel size.  Signal peak is the number of photons per pixel at the brightest part
-        of the spot.  Frame rates are relative.`)
+        d3.select('.explainerBox .content').html(`Above are windows simulating each camera, acquiring 16-bit image
+        data as quickly as possible.  Each window shows what an array of spots focused on the camera would look like, with the size
+        of the image held constant.  Signal peak is the number of photons per pixel at the brightest part
+        of the image.  Frame rates are relative. For ease of display, resolutions are downscaled by ` + cameras[0].pixelDecimation + 'X')
      }
 
      if (self.value == 'Slow'){
-        d3.select('.explainerBox .content').html(`Above are windows simulating a sub-area of each camera, acquiring 16-bit image
-        data with a 30-second exposure.  Each window shows what a small Gaussian spot focused on the camera would look like, with the size
-        of the spot scaled to match the cameras pixel size.  Signal peak is the number of photons per pixel at the brightest part
-        of the spot.  Frame rates are equal, as exposure time >> readout time.`)
+        d3.select('.explainerBox .content').html(`Above are windows simulating each camera, acquiring 16-bit image
+        data with a 30 second exposure time.  Each window shows what an array of spots focused on the camera would look like, with the size
+        of the image held constant.  Signal peak is the number of photons per pixel at the brightest part  Frame rates are equal, 
+        as exposure time >> readout time. For ease of display, resolutions are downscaled by ` + cameras[0].pixelDecimation + 'X')
      }
 
      
@@ -467,26 +508,34 @@ if (1){
         .style('display','flex')
 
     var idus420 = {
+        xPixels : 1024,
+        yPixels : 255,
+        xPixelSize : 26,
+        yPixelSize : 26,
         readNoise : 10,
         readNoiseFast: 10,
         readNoiseSlow: 4,
         QE : 0.95,
         frameRateHz : 0.34,
         frameRateHzFast: 0.34,
-        frameRateHzSlow: 1,    
+        frameRateHzSlow: 0.03,    
         darkCurrent : 0.008,    
         containerDivID : 'subContainer',
         displayName : 'Idus 420 BEX2-DD'}
     cameras.push(new Camera(idus420))
 
     var newton971 = {
+        xPixels : 1600,
+        yPixels : 400,
+        xPixelSize : 16,
+        yPixelSize : 16,
         readNoise : 0.04,
         readNoiseFast : 0.04,
         readNoiseSlow : 0.0028,
         QE : 0.95,
         frameRateHz : 10,
         frameRateHzFast : 10,
-        frameRateHzSlow : 1,
+        frameRateHzSlow: 0.03,
         darkCurrent : 0.00020,
         containerDivID : 'subContainer',
         emGain : 1, 
@@ -494,6 +543,10 @@ if (1){
     cameras.push(new Camera(newton971))
 
     var iXon888 = {
+        xPixels : 1024,
+        yPixels : 1024,
+        xPixelSize : 13,
+        yPixelSize : 13,    
         readNoise : 0.13,
         readNoiseFast: 0.13,
         readNoiseSlow: 0.012,
@@ -502,7 +555,7 @@ if (1){
         darkCurrent : 0.00011,
         frameRateHz : 26,
         frameRateHzFast: 26,
-        frameRateHzSlow: 1,
+        frameRateHzSlow: 0.03,
         emGain : 1,
        containerDivID : 'subContainer',
        model : models['BV'],
@@ -510,6 +563,10 @@ if (1){
     cameras.push(new Camera(iXon888))
 
     var newcam = {
+        xPixels : 2560,
+        yPixels : 2160,
+        xPixelSize : 6.5,
+        yPixelSize : 6.5,
         readNoise : 1.6,
         readNoiseFast : 1.6,
         readNoiseSlow : 1.2,
@@ -517,7 +574,7 @@ if (1){
         CIC : 0,
         frameRateHz : 75,
         frameRateHzFast : 75,
-        frameRateHzSlow : 1,
+        frameRateHzSlow: 0.03,
         darkCurrent : 0.019,
        containerDivID : 'subContainer',
        model : models['Zyla 5.5'],
@@ -528,18 +585,24 @@ if (1){
         readNoise : 1.3,
         readNoiseFast : 1.3,
         readNoiseSlow : 1.1 ,
+        xPixelSize : 6.5,
+        yPixelSize : 6.5,
         QE : 0.83,
         CIC : 0,
         frameRateHz : 101,
         frameRateHzFast : 101,
-        frameRateHzSlow : 1,
+        frameRateHzSlow: 0.03,
         darkCurrent : 0.019,
        containerDivID : 'subContainer',
        model : models['Zyla 4.2 PLUS'],
        displayName: 'Zyla 4.2+ 10-Tap'}
-    cameras.push(new Camera(newcam))
+    //cameras.push(new Camera(newcam))
 
     var newCam = {
+        xPixels : 2048,
+        yPixels : 2048,
+        xPixelSize : 11,
+        yPixelSize : 11,
         readNoise : 1.6,
         readNoiseFast : 1.6,
         readNoiseSlow : 1.6,
@@ -547,7 +610,7 @@ if (1){
         CIC : 0,
         frameRateHz : 24,
         frameRateHzFast : 24,
-        frameRateHzSlow : 1,
+        frameRateHzSlow: 0.03,
         darkCurrent : 0.2,
        containerDivID : 'subContainer',
        model : models['Sona'],
@@ -556,6 +619,10 @@ if (1){
 
     // ikon m 934
     var newCam = {
+        xPixels : 1024,
+        yPixels : 1024,
+        xPixelSize : 13.3,
+        yPixelSize : 13.3,
         readNoise : 11.6,
         readNoiseFast : 11.6,
         readNoiseSlow : 2.9,
@@ -564,7 +631,7 @@ if (1){
         CIC : 0,
         frameRateHz : 2.6,
         frameRateHzFast : 2.6,
-        frameRateHzSlow : 1 ,
+        frameRateHzSlow: 0.03 ,
        containerDivID : 'subContainer',
        model : models['BEX2-DD'],
        displayName: 'iKon-M 934 BEX2-DD'}
@@ -631,6 +698,16 @@ function animate(){
     window.requestAnimationFrame(animate);
 }
 
+
 // set up controls and start the animation process
 initializeControls();
+
+// generate a frame to beforehand to avoid weird moire
+cameras.forEach( function(x){
+    x.updateFPSLabel();
+    x.updateQELabel();
+    x.updateReadNoiseLabel();
+    x.draw()
+} )
+
 startAnimation();
