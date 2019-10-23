@@ -104,15 +104,16 @@ label {
     </div>
 
 <div class = 'explainerBox'>
-    <span class = 'emphatic'>What is this?</span> <span class = 'content'>Above are windows simulating a sub-area of each camera, acquiring 16-bit image
-    data as quickly as possible.  Each window shows what a small Gaussian spot focused on the camera would look like, with the size
-    of the spot scaled to match the cameras pixel size.  "Signal peak" is the number of photons per pixel at the brightest part
-    of the spot.  Frame rates are relative. </span>
+    <span class = 'emphatic'>What is this?</span> <span class = 'content'>Above are windows simulating each camera, acquiring 16-bit image
+    data as quickly as possible.  Each window shows what you'd see if you swapped out each camera, without changing magnification or optics.
+    "Signal peak" is equal to the number of photons hitting a 16um x 16um area at the brightest 99th percentile of the image.
+    Frame rates are relative. Resolution of each camera is attenuated by 15x to ease display on your screen. </span>
 </div>
 
 </body>
 
 <script src="js/d3.min.js"></script>
+<script src="js/jsonImages.js"></script>
 <script src="js/models.js"></script>
 <script src="js/videoSim.js"></script>
 

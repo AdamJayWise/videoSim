@@ -167,7 +167,7 @@ function Camera(paramObj){
     // create image data
     self.simImage = new Arr2d(self.xPixels, self.yPixels, 0)
 
-    if (self.hasRealImage){
+    if (self.hasRealImage & !self.imageSource){
         var v = 0;
         var w = 0;
         self.realImage = new Arr2d(self.xPixels, self.yPixels, 0);
@@ -179,6 +179,11 @@ function Camera(paramObj){
             }
         }
         
+    }
+
+    if (self.shortName){
+        self.realImage = new Arr2d(self.xPixels, self.yPixels, 0);
+        self.realImage.data = jsonImage[self.shortName];
     }
 
     this.updateData = function(){
@@ -470,16 +475,16 @@ d3.selectAll('[type = radio]').on('change', function(){
      // update the explainer box
      if (self.value == 'Fast'){
         d3.select('.explainerBox .content').html(`Above are windows simulating each camera, acquiring 16-bit image
-        data as quickly as possible.  Each window shows what an array of spots focused on the camera would look like, with the size
-        of the image held constant.  Signal peak is the number of photons per pixel at the brightest part
-        of the image.  Frame rates are relative. For ease of display, resolutions are downscaled by ` + cameras[0].pixelDecimation + 'X')
+        data as quickly as possible.  Each window shows what you'd see if you swapped out each camera, without changing magnification or optics.
+        "Signal peak" is equal to the number of photons hitting a 16um x 16um area at the brightest 99th percentile of the image.
+        Frame rates are relative. Resolution of each camera is attenuated by 15x to ease display on your screen.`)
      }
 
      if (self.value == 'Slow'){
         d3.select('.explainerBox .content').html(`Above are windows simulating each camera, acquiring 16-bit image
-        data with a 30 second exposure time.  Each window shows what an array of spots focused on the camera would look like, with the size
-        of the image held constant.  Signal peak is the number of photons per pixel at the brightest part  Frame rates are equal, 
-        as exposure time >> readout time. For ease of display, resolutions are downscaled by ` + cameras[0].pixelDecimation + 'X')
+        data with a 30s exposure time.  Each window shows what you'd see if you swapped out each camera, without changing 
+        magnification or optics.
+        "Signal peak" is equal to the number of photons hitting a 16um x 16um area at the brightest 99th percentile of the image. Resolution of each camera is attenuated by 15x to ease display on your screen.`)
      }
 
      
@@ -503,6 +508,7 @@ if (1){
         .style('display','flex')
 
     var idus420 = {
+        shortName : 'idus420',
         xPixels : 1024,
         yPixels : 255,
         xPixelSize : 26,
@@ -520,6 +526,7 @@ if (1){
     cameras.push(new Camera(idus420))
 
     var newton971 = {
+        shortName : 'Newton971',
         xPixels : 1600,
         yPixels : 400,
         xPixelSize : 16,
@@ -538,6 +545,7 @@ if (1){
     cameras.push(new Camera(newton971))
 
     var iXon888 = {
+        shortName : 'iXonUltra888',
         xPixels : 1024,
         yPixels : 1024,
         xPixelSize : 13,
@@ -558,6 +566,7 @@ if (1){
     cameras.push(new Camera(iXon888))
 
     var newcam = {
+        shortName : 'Zyla55',
         xPixels : 2560,
         yPixels : 2160,
         xPixelSize : 6.5,
@@ -577,6 +586,7 @@ if (1){
     cameras.push(new Camera(newcam))
 
     var newcam = {
+        shortName : 'Zyla42',
         readNoise : 1.3,
         readNoiseFast : 1.3,
         readNoiseSlow : 1.1 ,
@@ -594,6 +604,7 @@ if (1){
     //cameras.push(new Camera(newcam))
 
     var newCam = {
+        shortName : 'Sona42',
         xPixels : 2048,
         yPixels : 2048,
         xPixelSize : 11,
@@ -614,6 +625,7 @@ if (1){
 
     // ikon m 934
     var newCam = {
+        shortName : 'iKonM934',
         xPixels : 1024,
         yPixels : 1024,
         xPixelSize : 13.3,
