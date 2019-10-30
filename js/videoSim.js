@@ -1,6 +1,6 @@
-console.log('videoSim.js')
+console.log('videoSim.js - Adam Wise 2019')
 
-// global variables!
+// global variables, I love them
 var objPos = [0,0]; // x,y position of the feature in pixels
 var featureBrightness = 10; // peak brightness of the feature in photons / counts / whatever
 var speedMultiplier = 0.5; // fudge factor for random walk speed of the feature
@@ -68,14 +68,12 @@ function randnSample(nSamples = 1, mu = 0, sigma = 10) {
     return output;
 }
 
-
 function Camera(paramObj){
     var self = this;
     
     //default parameters
     console.log('setting parameters');
     self.name = 'Generic Camera'
-    self.displayScale = 0.115   ; // scale factor for displaying image on screen
     self.xPixels = 64; // number of pixels in x dimension
     self.yPixels = 64; // number of pixels in y dimension
     self.xPixelSize = 13; // x pixel size in microns
@@ -102,7 +100,8 @@ function Camera(paramObj){
     self.mode = 'Fast'; // fast or slow imaging mode
     self.exposureTime = 30; // exposure time in seconds
 
-    self.pixelDecimation = 15; // factor to reduce resolution to ease display on a monitor
+    self.displayScale = .1   ; // scale factor for displaying image on screen
+    self.pixelDecimation = 6; // factor to reduce resolution to ease display on a monitor
     self.hasRealImage = true; // should this camera have another real image available?
 
     if (paramObj){
@@ -112,6 +111,8 @@ function Camera(paramObj){
         self.div = d3.select('body').append('div').attr('class','cameraDiv');
     }
 
+
+
     if (paramObj){
         Object.keys(paramObj).forEach(function(k){self[k]=paramObj[k]})
     }
@@ -120,30 +121,49 @@ function Camera(paramObj){
     self.yPixels = Math.round(self.yPixels / self.pixelDecimation)
     
     // add a canvas to the document to display this data
-    self.canvas  = self.div
-                    .append('canvas')
-                    .attr('width', Math.round(self.displayScale * self.xPixelSize * self.xPixels) + ' px')
-                    .attr('height', Math.round(self.displayScale * self.yPixelSize * self.yPixels) + ' px')
-                    .style('border','3px solid black')
+    var displayScaleFactor = self.xPixelSize/6.5;
 
+    self.canvas  = self.div
+                    .append('div')
+                    .attr('class','canvasHolder')
+                    .style('border','3 px solid black')
+                    .style('padding-top',  0.5 * self.yPixels * (displayScaleFactor - 1) + 'px')
+                    .style('padding-bottom',  0.5 * self.yPixels * (displayScaleFactor - 1) + 'px')
+                    .style('width', self.yPixels * displayScaleFactor + 'px')
+                    .append('canvas')
+                    .attr('width', self.xPixels + ' px')
+                    .attr('height', self.yPixels + ' px')
+                    .style('transform','scale(' + displayScaleFactor + ')')
+                    .style('transform-origin','center left')
+
+
+                    
+                    // so original height is yPixels, new width is yPixels * displayScaleFactor
+                    // so top/bottom margin of 1/2 of the difference (ypixels*displayScaleFactor - ypixels)
+                    // or 0.5 * yPixels * (displayScaleFactor - 1)
+
+                    
     
-    self.div.append('p')
+
+    var labelContainer = self.div.append('div').attr('class','labelContainer')
+    
+    labelContainer.append('p')
         .style('margin','0')
         .html(self.displayName)
         .attr('class','windowLabel')
         .attr('class','nameLabel')
     
-    var readNoiseLabel = self.div.append('p')
+    var readNoiseLabel = labelContainer.append('p')
         .style('margin','0')
         .html(self.readNoise + ' e<sup>-</sup> Read Noise')
         .attr('class','windowLabel')
     
-    var QElabel = self.div.append('p')
+    var QElabel = labelContainer.append('p')
         .style('margin','0')
         .html(Math.round(self.QE*100) + '% QE')
         .attr('class','windowLabel')
 
-    var FPSlabel = self.div.append('p')
+    var FPSlabel = labelContainer.append('p')
         .style('margin','0')
         .html(self.frameRateHz + ' FPS')
         .attr('class','windowLabel')
@@ -310,25 +330,42 @@ function Camera(paramObj){
             arrRange = arrMax - arrMin;
         }
 
-
         var canvas = this.canvas._groups[0][0];
         var context = canvas.getContext("2d");
         var scale = self.xPixelSize * self.displayScale;
 
-        context.lineWidth = 0;
-        context.strokeStyle = 'none'
+        if (self.drawStyle){
+            context.lineWidth = 0;
+            context.strokeStyle = 'none'
 
-        for (var i = 0; i < self.xPixels; i++){
-            for (var j = 0; j < self.yPixels; j++){ 
-                var v = Math.round( 255*(arr.get(i,j)-arrMin)/arrRange );
-                context.fillStyle = `rgb(${v},${v},${v})`;
-                context.fillRect(i * scale, j * scale, scale, scale);
+            for (var i = 0; i < self.xPixels; i++){
+                for (var j = 0; j < self.yPixels; j++){ 
+                    var v = Math.round( 255*(arr.get(i,j)-arrMin)/arrRange );
+                    context.fillStyle = `rgb(${v},${v},${v})`;
+                    context.fillRect(i * scale, j * scale, scale, scale);
+                }
             }
+        }
+
+        if (1){
+            var img = new ImageData(self.xPixels, self.yPixels);
+            for (var i = 0; i<img.data.length; i+=4){
+                var k = Math.floor(i/4)%self.xPixels;
+                var l = Math.floor ( Math.floor(i/4) / self.xPixels);
+                var v = Math.round( 255*(arr.data[i/4]-arrMin)/arrRange );
+                img.data[i+0] = v;
+                img.data[i+1] = v;
+                img.data[i+2] = v;
+                img.data[i+3] = 255;
+            }
+            context.putImageData(img,0,0);
         }
     }
 
 
 }
+
+
 
 //2d array object to hold data
 
@@ -477,14 +514,15 @@ d3.selectAll('[type = radio]').on('change', function(){
         d3.select('.explainerBox .content').html(`Above are windows simulating each camera, acquiring 16-bit image
         data as quickly as possible.  Each window shows what you'd see if you swapped out each camera, without changing magnification or optics.
         "Signal peak" is equal to the number of photons hitting a 16um x 16um area at the brightest 99th percentile of the image.
-        Frame rates are relative. Resolution of each camera is attenuated by 15x to ease display on your screen.`)
+        Frame rates are relative. Resolution of each camera has been reduced to 1/6th of real to ease display on your screen.`)
      }
 
      if (self.value == 'Slow'){
         d3.select('.explainerBox .content').html(`Above are windows simulating each camera, acquiring 16-bit image
         data with a 30s exposure time.  Each window shows what you'd see if you swapped out each camera, without changing 
         magnification or optics.
-        "Signal peak" is equal to the number of photons hitting a 16um x 16um area at the brightest 99th percentile of the image. Resolution of each camera is attenuated by 15x to ease display on your screen.`)
+        "Signal peak" is equal to the number of photons hitting a 16um x 16um area at the brightest 99th percentile of the image. 
+        Resolution of each camera has been reduced to 1/6th of real to ease display on your screen.`)
      }
 
      
@@ -505,144 +543,20 @@ if (1){
     d3.select('#mainContainer')
         .append('div')
         .attr('id','subContainer')
-        .style('display','flex')
 
-    var idus420 = {
-        shortName : 'idus420',
-        xPixels : 1024,
-        yPixels : 255,
-        xPixelSize : 26,
-        yPixelSize : 26,
-        readNoise : 10,
-        readNoiseFast: 10,
-        readNoiseSlow: 4,
-        QE : 0.95,
-        frameRateHz : 0.34,
-        frameRateHzFast: 0.34,
-        frameRateHzSlow: 0.03,    
-        darkCurrent : 0.008,    
-        containerDivID : 'subContainer',
-        displayName : 'Idus 420 BEX2-DD'}
-    cameras.push(new Camera(idus420))
+    
+    cameras.push(new Camera( cameraDefs['idus420']));
+    cameras.push(new Camera( cameraDefs['newton971']));
+    cameras.push(new Camera( cameraDefs['iXon888'] ));
+    cameras.push(new Camera( cameraDefs['zyla55'] ));
+    cameras.push(new Camera( cameraDefs['sona42'] ));
+    //cameras.push(new Camera(zyla42ConfigObj))
+    cameras.push(new Camera( cameraDefs['iKonM934-BEX2-DD'] ));
 
-    var newton971 = {
-        shortName : 'Newton971',
-        xPixels : 1600,
-        yPixels : 400,
-        xPixelSize : 16,
-        yPixelSize : 16,
-        readNoise : 0.04,
-        readNoiseFast : 0.04,
-        readNoiseSlow : 0.0028,
-        QE : 0.95,
-        frameRateHz : 10,
-        frameRateHzFast : 10,
-        frameRateHzSlow: 0.03,
-        darkCurrent : 0.00020,
-        containerDivID : 'subContainer',
-        emGain : 1, 
-        displayName: 'Newton 971 BV'}
-    cameras.push(new Camera(newton971))
-
-    var iXon888 = {
-        shortName : 'iXonUltra888',
-        xPixels : 1024,
-        yPixels : 1024,
-        xPixelSize : 13,
-        yPixelSize : 13,    
-        readNoise : 0.13,
-        readNoiseFast: 0.13,
-        readNoiseSlow: 0.012,
-        QE : 0.95,
-        CIC : 0.005,
-        darkCurrent : 0.00011,
-        frameRateHz : 26,
-        frameRateHzFast: 26,
-        frameRateHzSlow: 0.03,
-        emGain : 1,
-       containerDivID : 'subContainer',
-       model : models['BV'],
-       displayName: 'iXon Ultra 888 BV'}
-    cameras.push(new Camera(iXon888))
-
-    var newcam = {
-        shortName : 'Zyla55',
-        xPixels : 2560,
-        yPixels : 2160,
-        xPixelSize : 6.5,
-        yPixelSize : 6.5,
-        readNoise : 1.6,
-        readNoiseFast : 1.6,
-        readNoiseSlow : 1.2,
-        QE : 0.6,
-        CIC : 0,
-        frameRateHz : 75,
-        frameRateHzFast : 75,
-        frameRateHzSlow: 0.03,
-        darkCurrent : 0.019,
-       containerDivID : 'subContainer',
-       model : models['Zyla 5.5'],
-       displayName: 'Zyla 5.5 10-Tap'}
-    cameras.push(new Camera(newcam))
-
-    var newcam = {
-        shortName : 'Zyla42',
-        readNoise : 1.3,
-        readNoiseFast : 1.3,
-        readNoiseSlow : 1.1 ,
-        xPixelSize : 6.5,
-        yPixelSize : 6.5,
-        QE : 0.83,
-        CIC : 0,
-        frameRateHz : 101,
-        frameRateHzFast : 101,
-        frameRateHzSlow: 0.03,
-        darkCurrent : 0.019,
-       containerDivID : 'subContainer',
-       model : models['Zyla 4.2 PLUS'],
-       displayName: 'Zyla 4.2+ 10-Tap'}
-    //cameras.push(new Camera(newcam))
-
-    var newCam = {
-        shortName : 'Sona42',
-        xPixels : 2048,
-        yPixels : 2048,
-        xPixelSize : 11,
-        yPixelSize : 11,
-        readNoise : 1.6,
-        readNoiseFast : 1.6,
-        readNoiseSlow : 1.6,
-        QE : 0.95,
-        CIC : 0,
-        frameRateHz : 24,
-        frameRateHzFast : 24,
-        frameRateHzSlow: 0.03,
-        darkCurrent : 0.2,
-       containerDivID : 'subContainer',
-       model : models['Sona'],
-       displayName: 'Sona 4.2'}
-    cameras.push(new Camera(newCam))
 
     // ikon m 934
-    var newCam = {
-        shortName : 'iKonM934',
-        xPixels : 1024,
-        yPixels : 1024,
-        xPixelSize : 13.3,
-        yPixelSize : 13.3,
-        readNoise : 11.6,
-        readNoiseFast : 11.6,
-        readNoiseSlow : 2.9,
-        darkCurrent : 0.00012,
-        QE : 0.95,
-        CIC : 0,
-        frameRateHz : 2.6,
-        frameRateHzFast : 2.6,
-        frameRateHzSlow: 0.03 ,
-       containerDivID : 'subContainer',
-       model : models['BEX2-DD'],
-       displayName: 'iKon-M 934 BEX2-DD'}
-    cameras.push(new Camera(newCam))
+
+    
 }
 
 // set up a matrix of parameters

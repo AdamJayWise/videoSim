@@ -4,20 +4,34 @@
 
 <style>
     canvas {
-        margin : 5px;
+        image-rendering: pixelated;
     }
 
     .container {
-        width: 800px;
+
     }
 
-    .subContainer {
-        display : inline-block;
-        width: 800px;
+    #subContainer {
+        
+    }
+
+    .labelContainer {
+        position : absolute;
+        top : 10px;
+        left : 10px;
+        font-family : Arial, sans-serif;
+        font-weight: 900;
+        background-color : rgba(255,255,255, 0.5);
+        text-shadow: 3px 3px 8px #FFFFFF;
+        padding : 5px;
+
+        
     }
 
     .cameraDiv {
-        display: inline-block;
+        margin : 10px;
+        position : relative;
+        font-weight : bold;
         
     }
 
@@ -90,6 +104,7 @@ label {
     display: block;
     margin : 5px;
     font-size : 14pt;
+    text-align : left;
 }
 
 </style>
@@ -107,7 +122,7 @@ label {
     <span class = 'emphatic'>What is this?</span> <span class = 'content'>Above are windows simulating each camera, acquiring 16-bit image
     data as quickly as possible.  Each window shows what you'd see if you swapped out each camera, without changing magnification or optics.
     "Signal peak" is equal to the number of photons hitting a 16um x 16um area at the brightest 99th percentile of the image.
-    Frame rates are relative. Resolution of each camera is attenuated by 15x to ease display on your screen. </span>
+    Frame rates are relative. Resolution of each camera has been reduced to 1/6th of real to ease display on your screen. </span>
 </div>
 
 </body>
@@ -115,6 +130,7 @@ label {
 <script src="js/d3.min.js"></script>
 <script src="js/jsonImages.js"></script>
 <script src="js/models.js"></script>
+<script src="js/cameraDefs.js"></script>
 <script src="js/videoSim.js"></script>
 
 </html>
