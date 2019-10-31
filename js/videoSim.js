@@ -103,7 +103,7 @@ function Camera(paramObj){
     self.model = models['BV']; // what chip variant
 
 
-    self.pixelDecimation = 6; // factor to reduce resolution to ease display on a monitor
+    self.pixelDecimation = 8; // factor to reduce resolution to ease display on a monitor
     self.hasRealImage = true; // should this camera have another real image available?
 
     if (paramObj){
@@ -144,7 +144,21 @@ function Camera(paramObj){
                     // or 0.5 * yPixels * (displayScaleFactor - 1)
 
                     
-    
+    function startDrag(){
+        var thisDiv = d3.select(this)
+        thisDiv.style('position','fixed')       
+    }
+
+    function dragging(){
+        var currentTop = Number(d3.select(this).style('top').slice(0,-2))
+        var currentLeft = Number(d3.select(this).style('left').slice(0,-2))
+        d3.select(this).style('left', currentLeft + d3.event.dx + 'px')
+        d3.select(this).style('top',currentTop + d3.event.dy + 'px')
+        console.log(currentTop)
+    }
+
+    self.div.call(d3.drag().on("start", startDrag).on('drag',dragging));
+
 
     var labelContainer = self.div.append('div').attr('class','labelContainer')
     
