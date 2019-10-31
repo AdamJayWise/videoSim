@@ -2,9 +2,15 @@ console.log('videoSim.js - Adam Wise 2019')
 
 // global variables, I love them
 var objPos = [0,0]; // x,y position of the feature in pixels
-var featureBrightness = 10; // peak brightness of the feature in photons / counts / whatever
+
 var speedMultiplier = 0.5; // fudge factor for random walk speed of the feature
 
+var app = {
+ 'mode' : 'Fast', // fast or slow imaging mode
+ 'exposureTime' : 30, // exposure time in seconds
+ 'wavelength' : 500, // wavelength of light incident on camera, in nm
+ 'featureBrightness' : 10, // peak brightness of the feature in photons / counts / whatever
+}
 // overall idea...
 // I want one or more camera objects, each one has an image object which it displays
 // the camera has a height and width, and controls
@@ -85,7 +91,6 @@ function Camera(paramObj){
     
     self.CIC = 0; // CIC in events / pixel / frame
     self.offset = 2; // offset in counts for the fake ADC
-    self.featureBrightness = 5; // brightness of image feature
     self.featureSigma = 10; // FWHM of image feature
     self.QE = 1; // camera quantum efficiency (QE), range from 0 to 1
     
@@ -96,11 +101,8 @@ function Camera(paramObj){
     self.darkCurrent = 0.001; // camera dark current in e/pix/sec
     self.emGain = 0; // em gain flag
     self.model = models['BV']; // what chip variant
-    self.wavelength = 500; // wavelength of light incident on camera, in nm
-    self.mode = 'Fast'; // fast or slow imaging mode
-    self.exposureTime = 30; // exposure time in seconds
 
-    self.displayScale = .1   ; // scale factor for displaying image on screen
+
     self.pixelDecimation = 6; // factor to reduce resolution to ease display on a monitor
     self.hasRealImage = true; // should this camera have another real image available?
 
@@ -110,7 +112,6 @@ function Camera(paramObj){
     else {
         self.div = d3.select('body').append('div').attr('class','cameraDiv');
     }
-
 
 
     if (paramObj){
@@ -208,7 +209,7 @@ function Camera(paramObj){
 
     this.updateData = function(){
 
-        self.QE = self.model.getQE(self.wavelength);
+        self.QE = self.model.getQE(app.wavelength);
         if(!self.QE){
             self.QE = 0;
         }
@@ -228,21 +229,7 @@ function Camera(paramObj){
             self.simImage.set(xCoord, yCoord, self.offset + (1+5*Math.random()));
         }
 
-        // right now, this adds a square feature to the random readout noise data
-        if (0){
-            var offsetX = Math.floor(self.xPixelSize * self.displayScale / 2);
-            var offsetY = Math.floor(self.xPixelSize * self.displayScale / 2);
-            var featureSize = 15;
-            var featureBrightness = 3;
-            var q;
-            for (var i = 0 + offsetX; i < (featureSize + offsetX); i++){
-                for (var j = 0 + offsetY; j < (featureSize + offsetY); j++){
-                    q = poissonSample(featureBrightness ,1)[0];
-                    self.simImage.set(i,j, q + self.simImage.get(i,j) );
-                }
-            }
-        }
-        // -------- end add square
+
 
         // generate data from 'real' image
 
@@ -252,7 +239,7 @@ function Camera(paramObj){
             for (var i = 0; i < self.xPixels; i++){
                 for (var j = 0; j < self.yPixels; j++){
 
-                    q = poissonSample(self.featureBrightness * self.QE * areaFrac * self.realImage.get(i,j) , 1)[0];
+                    q = poissonSample(app.featureBrightness * self.QE * areaFrac * self.realImage.get(i,j) , 1)[0];
                     self.simImage.set(i,j, q + self.simImage.get(i,j));
                 }
             }
@@ -264,7 +251,7 @@ function Camera(paramObj){
             var offsetX = Math.floor(self.xPixels/2);
             var offsetY = Math.floor(self.yPixels/2)
             var featureSize = 15;
-            var featureBrightness = self.featureBrightness  ;
+            var featureBrightness = app.featureBrightness  ;
             var fSigma = self.featureSigma; //feature sigma
             var q = 0;
             for (var i = 0; i < self.xPixels; i++){
@@ -299,8 +286,8 @@ function Camera(paramObj){
                         
                     var darkCounts = 0;
                     
-                    if (self.mode == 'Slow'){
-                        darkCounts =  poissonSample(self.darkCurrent * self.exposureTime, 1)[0]
+                    if (app.mode == 'Slow'){
+                        darkCounts =  poissonSample(self.darkCurrent * app.exposureTime, 1)[0]
                     }
 
                     self.simImage.set(i,j, q + darkCounts + self.simImage.get(i,j) );
@@ -318,14 +305,14 @@ function Camera(paramObj){
         if (self.hasRealImage){
             areaFrac = (self.xPixelSize * self.yPixelSize) / (16*16);
         } 
-        var arrMax = self.offset + 2*self.readNoise + self.QE  * self.featureBrightness * areaFrac + 0.5 * Math.sqrt(self.QE * areaFrac * self.featureBrightness );//Math.max(...arr.data);
+        var arrMax = self.offset + 2*self.readNoise + self.QE  * app.featureBrightness * areaFrac + 0.5 * Math.sqrt(self.QE * areaFrac * app.featureBrightness );//Math.max(...arr.data);
         var arrMin = self.offset - 2*self.readNoise;
         var arrRange = arrMax - arrMin;
 
         // if in slow imaging mode, include the dark current in the color scale calculations
-        if (self.mode == 'Slow'){
-            var darkCounts = self.darkCurrent * self.exposureTime;
-            arrMax = self.offset + 2*self.readNoise + self.QE * areaFrac * self.featureBrightness + 0.5 * Math.sqrt(self.QE * areaFrac * self.featureBrightness ) + darkCounts;//Math.max(...arr.data);
+        if (app.mode == 'Slow'){
+            var darkCounts = self.darkCurrent * app.exposureTime;
+            arrMax = self.offset + 2*self.readNoise + self.QE * areaFrac * app.featureBrightness + 0.5 * Math.sqrt(self.QE * areaFrac * app.featureBrightness ) + darkCounts;//Math.max(...arr.data);
             arrMin = self.offset - 2*self.readNoise - Math.sqrt(darkCounts) + darkCounts;
             arrRange = arrMax - arrMin;
         }
@@ -360,6 +347,10 @@ function Camera(paramObj){
             }
             context.putImageData(img,0,0);
         }
+    }
+
+    this.remove = function(){
+        self.div.remove();
     }
 
 
@@ -454,7 +445,7 @@ function initializeControls(){
         var sliderCallBackFactory = function(configObj){
             var f = function(){
                 self = this;
-                cameras.forEach(x => x[configObj['parameter']] = Number(self.value));
+                app[configObj['parameter']] = Number(self.value);
                 sliderLabel.text(self.value);
                 cameras.forEach(x=>x.updateData());
                 cameras.forEach(x=>x.draw());
@@ -497,17 +488,18 @@ checkBoxDiv
 
 d3.selectAll('[type = radio]').on('change', function(){
      var self = this;
-     cameras.forEach(x=>x.mode = this.value);
+     app.mode = this.value;
 
      cameras.forEach( function(cam){
-         cam.readNoise = cam['readNoise'+self.value];
-         cam.frameRateHz = cam['frameRateHz'+self.value];
-         console.log(self.value);
-         cam.updateReadNoiseLabel();
-         cam.updateFPSLabel();
-         cam.updateData();
-         cam.draw();
-     } );
+        cam.readNoise = cam['readNoise' + app.mode];
+        cam.frameRateHz = cam['frameRateHz' + app.mode];
+        console.log(app.mode);
+        cam.updateReadNoiseLabel();
+        cam.updateFPSLabel();
+        cam.updateData();
+        cam.draw();
+    } );
+
 
      // update the explainer box
      if (self.value == 'Fast'){
@@ -527,6 +519,49 @@ d3.selectAll('[type = radio]').on('change', function(){
 
      
     })
+
+    // add checkboxes to the controls for each camera in camerasdefs
+    var availableCameras = Object.keys(cameraDefs);
+    for (var i in availableCameras){
+        var checkDiv = d3.select("#mainControls").append('div')
+        checkDiv.append('input')
+            .attr("type","checkbox")
+            .property('checked',false)
+            .property('value',cameraDefs[availableCameras[i]]['shortName'])
+            .property('key', availableCameras[i])
+            .on('change', function(){
+                var self = d3.select(this);
+                console.log(d3.select(this).property('checked'));
+                console.log(d3.select(this).property('value'));
+
+                if (self.property('checked')){
+                    cameras.push(new Camera(cameraDefs[self.property('key')]))
+                    console.log(self.property('key'))
+
+                    cameras.forEach( function(cam){
+                        cam.readNoise = cam['readNoise' + app.mode];
+                        cam.frameRateHz = cam['frameRateHz' + app.mode];
+                        console.log(app.mode);
+                        cam.updateReadNoiseLabel();
+                        cam.updateFPSLabel();
+                        cam.updateData();
+                        cam.draw();
+                    } );
+
+                }
+
+                if (!self.property('checked')){
+                for (var q = 0; q < cameras.length; q++){
+                    if (cameras[q].shortName == self.property('value')){
+                        console.log('ting')
+                        cameras[q].remove();
+                        cameras.splice(q,q)
+                        }
+                    }
+                }
+            })
+        checkDiv.append('span').text(cameraDefs[availableCameras[i]]['displayName'])
+        }
     
 }
 
@@ -537,6 +572,8 @@ var delta = 0;
 // add some sample cameras to the screen
 var cameras = [];
 
+
+
 // show different cameras
 if (1){
 
@@ -545,13 +582,12 @@ if (1){
         .attr('id','subContainer')
 
     
-    cameras.push(new Camera( cameraDefs['idus420']));
-    cameras.push(new Camera( cameraDefs['newton971']));
-    cameras.push(new Camera( cameraDefs['iXon888'] ));
-    cameras.push(new Camera( cameraDefs['zyla55'] ));
-    cameras.push(new Camera( cameraDefs['sona42'] ));
-    //cameras.push(new Camera(zyla42ConfigObj))
-    cameras.push(new Camera( cameraDefs['iKonM934-BEX2-DD'] ));
+    //cameras.push(new Camera( cameraDefs['idus420']));
+    //cameras.push(new Camera( cameraDefs['newton971']));
+    //cameras.push(new Camera( cameraDefs['iXon888'] ));
+    //cameras.push(new Camera( cameraDefs['zyla55'] ));
+    //cameras.push(new Camera( cameraDefs['sona42'] ));
+    //cameras.push(new Camera( cameraDefs['iKonM934-BEX2-DD'] ));
 
 
     // ikon m 934

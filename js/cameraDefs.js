@@ -20,6 +20,9 @@ var cameraDefs = {
 
     'zyla42' : {
         shortName : 'Zyla42',
+        hasRealImage : false,
+        xPixels : 2048,
+        yPixels : 2048,
         readNoise : 1.3,
         readNoiseFast : 1.3,
         readNoiseSlow : 1.1 ,
