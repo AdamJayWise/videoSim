@@ -20,7 +20,7 @@ var cameraDefs = {
 
     'zyla42' : {
         shortName : 'Zyla42',
-        hasRealImage : false,
+        hasRealImage : true,
         xPixels : 2048,
         yPixels : 2048,
         readNoise : 1.3,
@@ -37,6 +37,26 @@ var cameraDefs = {
         containerDivID : 'subContainer',
         model : models['Zyla 4.2 PLUS'],
         displayName: 'Zyla 4.2+ 10-Tap'},
+
+        'balor' : {
+            shortName : 'Balor',
+            hasRealImage : true,
+            xPixels : 4128,
+            yPixels : 4104,
+            readNoise : 2.9,
+            readNoiseFast : 2.9,
+            readNoiseSlow : 2.9 ,
+            xPixelSize : 12,
+            yPixelSize : 12,
+            QE : 0.61,
+            CIC : 0,
+            frameRateHz : 54,
+            frameRateHzFast : 54,
+            frameRateHzSlow: 0.03,
+            darkCurrent : 0.03,
+            containerDivID : 'subContainer',
+            model : models['Zyla 5.5'],
+            displayName: 'Balor'},
 
     
         'sona42' : {

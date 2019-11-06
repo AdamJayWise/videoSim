@@ -10,6 +10,7 @@ var app = {
  'exposureTime' : 30, // exposure time in seconds
  'wavelength' : 500, // wavelength of light incident on camera, in nm
  'featureBrightness' : 10, // peak brightness of the feature in photons / counts / whatever
+ 'activeDataSet' : 0 // which data set is currently active
 }
 // overall idea...
 // I want one or more camera objects, each one has an image object which it displays
@@ -218,7 +219,7 @@ function Camera(paramObj){
 
     if (self.shortName){
         self.realImage = new Arr2d(self.xPixels, self.yPixels, 0);
-        self.realImage.data = jsonImage[self.shortName];
+        self.realImage.data = jsonImage[self.shortName + app.activeDataSet];
     }
 
     this.updateData = function(){
@@ -474,6 +475,26 @@ function initializeControls(){
     //createSlider(featureWidthConfig);
     createSlider(wavelengthConfig);
 
+
+    // add a drop down selector for data type
+    d3.select('#mainControls').append('hr');
+    var chooserDiv = d3.select('#mainControls').append('div').attr('class','sliderLabel');
+    chooserDiv.append('span').text('Data Set : ');
+    var dataSetChooser = chooserDiv.append('select').attr('name','dataSet');
+    dataSetChooser.append('option').property('value','0').text('Cells 0')
+    dataSetChooser.append('option').property('value','1').text('Cells 1')
+    dataSetChooser.on('change', function(){
+        var self = this;
+        app.activeDataSet = this.value;
+        cameras.forEach(function(cam){
+            cam.realImage.data = jsonImage[cam.shortName + self.value];
+            cam.updateData();
+            cam.draw();
+        });
+        
+    })
+
+
     d3.select('#mainControls').append('hr')
 
     var checkBoxDiv = d3.select('#mainControls')
@@ -513,6 +534,8 @@ d3.selectAll('[type = radio]').on('change', function(){
         cam.updateData();
         cam.draw();
     } );
+
+
 
 
      // update the explainer box
