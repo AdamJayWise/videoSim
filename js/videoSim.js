@@ -412,7 +412,7 @@ function initializeControls(){
         labelText : 'Signal Peak, Photons',
         parameter : 'featureBrightness',
         min : 1,
-        max : 100,
+        max : 1000,
         defaultValue: 3
     }
 
